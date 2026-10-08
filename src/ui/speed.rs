@@ -89,21 +89,23 @@ pub fn view(app: &App) -> Element<'_, Message> {
 
     // Geçmiş grafiği
     let hist: Vec<_> = st.history.iter().rev().take(60).rev().collect();
-    let chart = card(
-        "Geçmiş (son 60 test)",
-        "Mbps",
+    let chart_body: Element<'_, Message> = if hist.len() < 2 {
+        text("Grafik için en az iki test sonucu gerekiyor.").size(11).color(p().muted).into()
+    } else {
         canvas(LineChart {
             series: vec![
                 (hist.iter().map(|r| r.download_mbps).collect(), p().rx),
                 (hist.iter().map(|r| r.upload_mbps).collect(), p().tx),
             ],
-            fmt: Box::new(|v| format!("{v:.0} Mbps")),
+            fmt: Box::new(|v| if v < 10.0 { format!("{v:.1} Mbps") } else { format!("{v:.0} Mbps") }),
             span_secs: None,
             capacity: hist.len().max(2),
         })
         .width(Length::Fill)
-        .height(180),
-    );
+        .height(180)
+        .into()
+    };
+    let chart = card("Geçmiş (son 60 test)", "■ mavi: indirme · ■ turuncu: yükleme (Mbps)", chart_body);
 
     // Geçmiş tablosu
     let w = |v: f32| Length::Fixed(v);

@@ -1,24 +1,31 @@
 # NexNWatch İlerleme
 
 ## RC1
-- [x] Proje iskeleti
-- [x] NexNWatch marka adı
-- [x] Koyu tema / konsept dashboard
-- [x] NIC keşfi
-- [x] Link hızı / durum / MAC / MTU
-- [x] RX/TX gerçek zamanlı ölçüm
-- [x] 60 sn grafik
-- [x] 1/5/10 dk toplamlar
-- [x] Process listesi
-- [x] Admin manifest
-- [ ] IPv4/IPv6 adreslerinin tam keşfi
-- [ ] ETW Kernel-Network
-- [ ] PID bazlı trafik
-- [ ] Recursive process tree attribution
-- [ ] Speedtest
-- [ ] Ayarlar
-- [ ] Kalıcı günlük/haftalık/aylık sayaç
-- [ ] Installer / imza / final ikon seti
+- [x] Proje iskeleti, marka, koyu tema dashboard
+- [x] NIC keşfi, link hızı / durum / MAC / MTU
+- [x] RX/TX ölçümü, 60 sn grafik, 1/5/10 dk toplamlar
+- [x] Process listesi, admin manifest
 
-## RC2 hedefi
-ETW consumer + PID traffic attribution. `ferrisetw` ile Microsoft-Windows-Kernel-Network provider bağlanacak; callback yalnızca olayları toplayacak ve işleme ana state katmanında yapılacak.
+## RC2
+- [x] IPv4/IPv6, ağ geçidi, DNS (GetAdaptersAddresses)
+- [x] Duplex (MSFT_NetAdapter.FullDuplex, arka planda)
+- [x] Filtre sürücüsü / WAN Miniport / tünel gürültüsünün elenmesi
+- [x] Sanal adaptörlerin ayrı grupta toplanması, "Tüm Adaptörler" = fiziksel toplam
+- [x] Adaptör sayacı reset tespiti
+- [x] ETW Kernel-Network → PID bazlı trafik
+- [x] Recursive process ağacı, PID reuse kontrolü, ağaç toplamı
+- [x] En çok trafik kullanan process'ler, aranabilir/sıralanabilir liste
+- [x] Hız testi (manuel + otomatik), geçmiş, pencere toplamından hariç tutma
+- [x] Kalıcı günlük/haftalık/aylık sayaç, Raporlar sayfası
+- [x] Ayarlar (config.toml), açık/koyu tema, birim seçimi
+- [x] Windows açılışında başlatma (Görev Zamanlayıcı)
+- [x] Dosyaya log, panic hook + yeniden başlatma, kapanışta ETW StopTrace
+- [x] GitHub Actions Windows derlemesi
+
+## Sonraki adaylar
+- [ ] ETW çalışmazsa yedek: GetExtendedTcpTable + GetPerTcpConnectionEStats
+- [ ] Process başına bağlantı listesi (uzak IP/port, ETW daddr/dport alanlarından)
+- [ ] Process bazlı kalıcı kullanım (uygulama adına göre günlük)
+- [ ] Sistem tepsisine küçültme, eşik aşımında bildirim
+- [ ] Final ikon seti (.ico), imzalama, installer
+- [ ] 24 saat dayanıklılık testi

@@ -71,7 +71,7 @@ impl<Message> Program<Message> for LineChart {
                 };
                 frame.fill_text(Text {
                     content: label,
-                    position: Point::new((x - 12.0).max(LEFT), TOP + plot_h + 5.0),
+                    position: Point::new((x - 12.0).clamp(LEFT, LEFT + plot_w - 34.0), TOP + plot_h + 5.0),
                     color: p().muted,
                     size: 10.0.into(),
                     ..Text::default()
