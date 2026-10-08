@@ -15,11 +15,11 @@ jobs:
     name: Test (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v5
+      # Problem matcher: rustc/clippy hataları PR'da satır açıklaması olarak görünür
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2
       - name: Biçim
         run: cargo fmt --check
       - name: Clippy
@@ -31,11 +31,10 @@ jobs:
     name: Windows release + installer
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           components: clippy
-      - uses: Swatinem/rust-cache@v2
 
       - name: Clippy (Windows'a özgü kod dahil)
         run: cargo clippy --all-targets -- -D warnings
