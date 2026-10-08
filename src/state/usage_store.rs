@@ -97,7 +97,7 @@ impl UsageStore {
             }
         }
         let mut v: Vec<_> = map.into_iter().collect();
-        v.sort_by(|a, b| b.1.total().cmp(&a.1.total()));
+        v.sort_by_key(|b| std::cmp::Reverse(b.1.total()));
         v
     }
 

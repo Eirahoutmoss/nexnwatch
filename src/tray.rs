@@ -19,7 +19,9 @@ mod imp {
     use std::sync::OnceLock;
 
     use tray_icon::menu::{IsMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem};
-    use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
+    use tray_icon::{
+        Icon, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent,
+    };
 
     thread_local! {
         static TRAY: RefCell<Option<TrayIcon>> = const { RefCell::new(None) };
@@ -75,9 +77,11 @@ mod imp {
         while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
             match ev {
                 TrayIconEvent::DoubleClick { .. } => out.push(TrayAction::Show),
-                TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } => {
-                    out.push(TrayAction::Show)
-                }
+                TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => out.push(TrayAction::Show),
                 _ => {}
             }
         }
@@ -108,7 +112,11 @@ mod imp {
         let (title, body) = (title.to_string(), body.to_string());
         std::thread::spawn(move || {
             use tauri_winrt_notification::Toast;
-            if let Err(e) = Toast::new(Toast::POWERSHELL_APP_ID).title(&title).text1(&body).show() {
+            if let Err(e) = Toast::new(Toast::POWERSHELL_APP_ID)
+                .title(&title)
+                .text1(&body)
+                .show()
+            {
                 tracing::warn!("Bildirim gösterilemedi: {e:?}");
             }
         });

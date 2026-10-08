@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::time::Instant;
 
-use iced::widget::{column, row, scrollable, text, text_input, Space};
+use iced::widget::{Space, column, row, scrollable, text, text_input};
 use iced::{Alignment, Element, Length};
 
 use crate::app::{App, Message};
@@ -54,18 +54,31 @@ pub fn view(app: &App) -> Element<'_, Message> {
         .filter(|(k, _)| scope.as_ref().is_none_or(|(set, _)| set.contains(&k.pid)))
         .map(|(key, bytes)| {
             let (remote, local) = orient(app, &key);
-            ConnRow { pid: key.pid, key, remote, local, bytes }
+            ConnRow {
+                pid: key.pid,
+                key,
+                remote,
+                local,
+                bytes,
+            }
         })
         .filter(|r| {
             if q.is_empty() {
                 return true;
             }
-            let name = app.process(r.pid).map(|p| p.name.to_lowercase()).unwrap_or_default();
-            let host = app.resolver.lookup(r.remote.ip()).unwrap_or_default().to_lowercase();
+            let name = app
+                .process(r.pid)
+                .map(|p| p.name.to_lowercase())
+                .unwrap_or_default();
+            let host = app
+                .resolver
+                .lookup(r.remote.ip())
+                .unwrap_or_default()
+                .to_lowercase();
             name.contains(&q) || r.remote.to_string().contains(&q) || host.contains(&q)
         })
         .collect();
-    rows.sort_by(|a, b| (b.bytes.rx + b.bytes.tx).cmp(&(a.bytes.rx + a.bytes.tx)));
+    rows.sort_by_key(|b| std::cmp::Reverse(b.bytes.rx + b.bytes.tx));
     let total = rows.len();
 
     let w = |v: f32| Length::Fixed(v);
@@ -83,7 +96,10 @@ pub fn view(app: &App) -> Element<'_, Message> {
 
     let mut list = column![].spacing(2);
     for r in rows.iter().take(200) {
-        let name = app.process(r.pid).map(|p| p.name.clone()).unwrap_or_else(|| format!("PID {}", r.pid));
+        let name = app
+            .process(r.pid)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| format!("PID {}", r.pid));
         let host = app.resolver.lookup(r.remote.ip());
         let svc = rdns::service(r.remote.port()).or_else(|| rdns::service(r.local.port()));
         let host_text = match (host, svc) {
@@ -96,17 +112,42 @@ pub fn view(app: &App) -> Element<'_, Message> {
         let fresh = ago < 5;
         list = list.push(
             row![
-                text(format!("{name} ({})", r.pid)).size(11).color(p().text).width(w(150.0)),
-                text(r.key.proto.label()).size(11).color(p().muted).width(w(46.0)),
-                text(r.remote.to_string()).size(11).color(if fresh { p().title } else { p().text }).width(w(230.0)),
-                text(host_text).size(11).color(p().muted).width(Length::Fill),
-                text(r.local.port().to_string()).size(11).color(p().muted).width(w(64.0)),
-                text(units::bytes(r.bytes.rx)).size(11).color(p().rx).width(w(78.0)),
-                text(units::bytes(r.bytes.tx)).size(11).color(p().tx).width(w(86.0)),
-                text(if fresh { "şimdi".to_string() } else { units::ago(ago) })
+                text(format!("{name} ({})", r.pid))
                     .size(11)
-                    .color(if fresh { p().good } else { p().muted })
+                    .color(p().text)
+                    .width(w(150.0)),
+                text(r.key.proto.label())
+                    .size(11)
+                    .color(p().muted)
+                    .width(w(46.0)),
+                text(r.remote.to_string())
+                    .size(11)
+                    .color(if fresh { p().title } else { p().text })
+                    .width(w(230.0)),
+                text(host_text)
+                    .size(11)
+                    .color(p().muted)
+                    .width(Length::Fill),
+                text(r.local.port().to_string())
+                    .size(11)
+                    .color(p().muted)
                     .width(w(64.0)),
+                text(units::bytes(r.bytes.rx))
+                    .size(11)
+                    .color(p().rx)
+                    .width(w(78.0)),
+                text(units::bytes(r.bytes.tx))
+                    .size(11)
+                    .color(p().tx)
+                    .width(w(86.0)),
+                text(if fresh {
+                    "şimdi".to_string()
+                } else {
+                    units::ago(ago)
+                })
+                .size(11)
+                .color(if fresh { p().good } else { p().muted })
+                .width(w(64.0)),
             ]
             .spacing(6),
         );
@@ -123,8 +164,16 @@ pub fn view(app: &App) -> Element<'_, Message> {
             .size(12)
             .padding(7)
             .width(Length::Fixed(280.0)),
-        chip(scope_label, !app.conn_scope_all, Message::ConnScopeAll(false)),
-        chip("Tümü".into(), app.conn_scope_all, Message::ConnScopeAll(true)),
+        chip(
+            scope_label,
+            !app.conn_scope_all,
+            Message::ConnScopeAll(false)
+        ),
+        chip(
+            "Tümü".into(),
+            app.conn_scope_all,
+            Message::ConnScopeAll(true)
+        ),
         Space::new().width(Length::Fill),
         text(format!("{total} bağlantı")).size(11).color(p().muted),
     ]
@@ -137,10 +186,17 @@ pub fn view(app: &App) -> Element<'_, Message> {
     };
 
     let body: Element<'_, Message> = if total == 0 {
-        text("Gösterilecek bağlantı yok.").size(11).color(p().muted).into()
+        text("Gösterilecek bağlantı yok.")
+            .size(11)
+            .color(p().muted)
+            .into()
     } else {
         scrollable(list).height(Length::Fixed(320.0)).into()
     };
 
-    card("Bağlantılar", note, column![controls, header, body].spacing(8))
+    card(
+        "Bağlantılar",
+        note,
+        column![controls, header, body].spacing(8),
+    )
 }

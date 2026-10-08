@@ -23,7 +23,7 @@ mod imp {
     };
     use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6};
 
-    use crate::collectors::etw::{accumulate, ConnBytes, ConnKey, EtwHandle, PidBytes, Proto};
+    use crate::collectors::etw::{ConnBytes, ConnKey, EtwHandle, PidBytes, Proto, accumulate};
 
     const ESTABLISHED: u32 = 5;
 
@@ -48,13 +48,27 @@ mod imp {
     fn table(af: u16) -> Option<Vec<u64>> {
         let mut size: u32 = 0;
         unsafe {
-            GetExtendedTcpTable(std::ptr::null_mut(), &mut size, 0, af as u32, TCP_TABLE_OWNER_PID_ALL, 0);
+            GetExtendedTcpTable(
+                std::ptr::null_mut(),
+                &mut size,
+                0,
+                af as u32,
+                TCP_TABLE_OWNER_PID_ALL,
+                0,
+            );
         }
         for _ in 0..3 {
             let mut buf = vec![0u64; (size as usize).div_ceil(8) + 64];
             let mut sz = (buf.len() * 8) as u32;
             let rc = unsafe {
-                GetExtendedTcpTable(buf.as_mut_ptr().cast(), &mut sz, 0, af as u32, TCP_TABLE_OWNER_PID_ALL, 0)
+                GetExtendedTcpTable(
+                    buf.as_mut_ptr().cast(),
+                    &mut sz,
+                    0,
+                    af as u32,
+                    TCP_TABLE_OWNER_PID_ALL,
+                    0,
+                )
             };
             if rc == 0 {
                 return Some(buf);
@@ -92,11 +106,19 @@ mod imp {
                     let key = ConnKey {
                         pid: r.dwOwningPid,
                         proto: Proto::Tcp,
-                        a: SocketAddr::new(IpAddr::V4(Ipv4Addr::from(r.dwRemoteAddr.to_ne_bytes())), port(r.dwRemotePort)),
-                        b: SocketAddr::new(IpAddr::V4(Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes())), port(r.dwLocalPort)),
+                        a: SocketAddr::new(
+                            IpAddr::V4(Ipv4Addr::from(r.dwRemoteAddr.to_ne_bytes())),
+                            port(r.dwRemotePort),
+                        ),
+                        b: SocketAddr::new(
+                            IpAddr::V4(Ipv4Addr::from(r.dwLocalAddr.to_ne_bytes())),
+                            port(r.dwLocalPort),
+                        ),
                     };
                     if !prev.contains_key(&key) {
-                        let rw = TCP_ESTATS_DATA_RW_v0 { EnableCollection: true };
+                        let rw = TCP_ESTATS_DATA_RW_v0 {
+                            EnableCollection: true,
+                        };
                         SetPerTcpConnectionEStats(
                             &row,
                             TcpConnectionEstatsData,
@@ -121,7 +143,16 @@ mod imp {
                         std::mem::size_of::<TCP_ESTATS_DATA_ROD_v0>() as u32,
                     );
                     if rc == 0 {
-                        record(prev, &mut seen, &mut pids, &mut conns, key, rod.DataBytesIn, rod.DataBytesOut, now);
+                        record(
+                            prev,
+                            &mut seen,
+                            &mut pids,
+                            &mut conns,
+                            key,
+                            rod.DataBytesIn,
+                            rod.DataBytesOut,
+                            now,
+                        );
                     }
                 }
             }
@@ -147,11 +178,19 @@ mod imp {
                     let key = ConnKey {
                         pid: r.dwOwningPid,
                         proto: Proto::Tcp,
-                        a: SocketAddr::new(IpAddr::V6(Ipv6Addr::from(r.ucRemoteAddr)), port(r.dwRemotePort)),
-                        b: SocketAddr::new(IpAddr::V6(Ipv6Addr::from(r.ucLocalAddr)), port(r.dwLocalPort)),
+                        a: SocketAddr::new(
+                            IpAddr::V6(Ipv6Addr::from(r.ucRemoteAddr)),
+                            port(r.dwRemotePort),
+                        ),
+                        b: SocketAddr::new(
+                            IpAddr::V6(Ipv6Addr::from(r.ucLocalAddr)),
+                            port(r.dwLocalPort),
+                        ),
                     };
                     if !prev.contains_key(&key) {
-                        let rw = TCP_ESTATS_DATA_RW_v0 { EnableCollection: true };
+                        let rw = TCP_ESTATS_DATA_RW_v0 {
+                            EnableCollection: true,
+                        };
                         SetPerTcp6ConnectionEStats(
                             &row,
                             TcpConnectionEstatsData,
@@ -176,14 +215,25 @@ mod imp {
                         std::mem::size_of::<TCP_ESTATS_DATA_ROD_v0>() as u32,
                     );
                     if rc == 0 {
-                        record(prev, &mut seen, &mut pids, &mut conns, key, rod.DataBytesIn, rod.DataBytesOut, now);
+                        record(
+                            prev,
+                            &mut seen,
+                            &mut pids,
+                            &mut conns,
+                            key,
+                            rod.DataBytesIn,
+                            rod.DataBytesOut,
+                            now,
+                        );
                     }
                 }
             }
         }
 
         prev.retain(|k, _| seen.contains(k));
-        handle.events.fetch_add(seen.len() as u64, Ordering::Relaxed);
+        handle
+            .events
+            .fetch_add(seen.len() as u64, Ordering::Relaxed);
         handle.merge(&mut pids, &mut conns);
     }
 

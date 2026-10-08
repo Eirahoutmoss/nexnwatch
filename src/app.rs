@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
-use iced::{application, window, Subscription, Task, Theme};
+use iced::{Subscription, Task, Theme, application, window};
 
 use crate::collectors::etw::{self, EtwHandle, EtwStatus};
 use crate::collectors::rdns::Resolver;
@@ -164,7 +164,9 @@ impl App {
             .as_ref()
             .and_then(|name| adapters.iter().find(|a| &a.name == name))
             .or_else(|| {
-                adapters.iter().find(|a| a.status == nic::AdapterStatus::Up && !a.kind.is_virtual())
+                adapters
+                    .iter()
+                    .find(|a| a.status == nic::AdapterStatus::Up && !a.kind.is_virtual())
             })
             .map(|a| a.index);
 
@@ -225,10 +227,17 @@ impl App {
 
         // Duplex bilgisi (PowerShell) arka planda.
         let duplex = Task::perform(
-            async { tokio::task::spawn_blocking(nic::duplex_map).await.unwrap_or_default() },
+            async {
+                tokio::task::spawn_blocking(nic::duplex_map)
+                    .await
+                    .unwrap_or_default()
+            },
             Message::DuplexLoaded,
         );
-        (app, Task::batch([duplex, window::latest().map(Message::WindowId)]))
+        (
+            app,
+            Task::batch([duplex, window::latest().map(Message::WindowId)]),
+        )
     }
 
     fn update_local_ips(&mut self) {
@@ -236,16 +245,24 @@ impl App {
             .adapters
             .iter()
             .flat_map(|a| a.ipv4.iter().chain(a.ipv6.iter()))
-            .filter_map(|s| s.split('/').next().and_then(|ip| ip.split('%').next()).and_then(|ip| ip.parse().ok()))
+            .filter_map(|s| {
+                s.split('/')
+                    .next()
+                    .and_then(|ip| ip.split('%').next())
+                    .and_then(|ip| ip.parse().ok())
+            })
             .collect();
     }
 
     pub fn selected_adapter(&self) -> Option<&nic::AdapterInfo> {
-        self.selected.and_then(|i| self.adapters.iter().find(|a| a.index == i))
+        self.selected
+            .and_then(|i| self.adapters.iter().find(|a| a.index == i))
     }
 
     pub fn selected_label(&self) -> String {
-        self.selected_adapter().map(|a| a.name.clone()).unwrap_or_else(|| ALL_LABEL.into())
+        self.selected_adapter()
+            .map(|a| a.name.clone())
+            .unwrap_or_else(|| ALL_LABEL.into())
     }
 
     pub fn tick_period(&self) -> Duration {
@@ -274,7 +291,9 @@ impl App {
     }
 
     pub fn process(&self, pid: u32) -> Option<&process::ProcessInfo> {
-        self.proc_index.get(&pid).and_then(|i| self.processes.get(*i))
+        self.proc_index
+            .get(&pid)
+            .and_then(|i| self.processes.get(*i))
     }
 
     fn reset_selected_stream(&mut self) {
@@ -291,12 +310,12 @@ impl App {
             Ok(list) => {
                 self.adapters = list;
                 self.update_local_ips();
-                if let Some(i) = self.selected {
-                    if !self.adapters.iter().any(|a| a.index == i) {
-                        self.notice = Some("Seçili adaptör kayboldu; tüm adaptörlere geçildi.".into());
-                        self.selected = None;
-                        self.reset_selected_stream();
-                    }
+                if let Some(i) = self.selected
+                    && !self.adapters.iter().any(|a| a.index == i)
+                {
+                    self.notice = Some("Seçili adaptör kayboldu; tüm adaptörlere geçildi.".into());
+                    self.selected = None;
+                    self.reset_selected_stream();
                 }
             }
             Err(e) => tracing::warn!("Adaptör yenileme hatası: {e}"),
@@ -322,7 +341,13 @@ impl App {
                     if let Some(&(prx, ptx)) = self.prev_counters.get(&r.index) {
                         let (drx, dtx) = (r.rx.saturating_sub(prx), r.tx.saturating_sub(ptx));
                         if elapsed > 0.0 {
-                            self.rates.insert(r.index, Rate { rx: drx as f64 / elapsed, tx: dtx as f64 / elapsed });
+                            self.rates.insert(
+                                r.index,
+                                Rate {
+                                    rx: drx as f64 / elapsed,
+                                    tx: dtx as f64 / elapsed,
+                                },
+                            );
                         }
                         if !r.is_virtual && r.rx >= prx && r.tx >= ptx {
                             physical_delta.0 += drx;
@@ -341,9 +366,13 @@ impl App {
                 // Seçili kaynak: tek adaptör ya da fiziksel adaptörlerin toplamı.
                 let raw = match self.selected {
                     Some(i) => rows.iter().find(|r| r.index == i).map(|r| (r.rx, r.tx)),
-                    None => Some(rows.iter().filter(|r| !r.is_virtual).fold((0u64, 0u64), |a, r| {
-                        (a.0.saturating_add(r.rx), a.1.saturating_add(r.tx))
-                    })),
+                    None => Some(
+                        rows.iter()
+                            .filter(|r| !r.is_virtual)
+                            .fold((0u64, 0u64), |a, r| {
+                                (a.0.saturating_add(r.rx), a.1.saturating_add(r.tx))
+                            }),
+                    ),
                 };
 
                 if let Some((rx, tx)) = raw {
@@ -351,7 +380,10 @@ impl App {
                         if rx < prx || tx < ptx {
                             // Adaptör sıfırlandı (yeniden başlatma / sürücü reset).
                             tracing::warn!("Adaptör sayacı sıfırlandı; pencere temizleniyor");
-                            self.notice = Some("Adaptör sayacı sıfırlandı — pencere toplamları yeniden başladı.".into());
+                            self.notice = Some(
+                                "Adaptör sayacı sıfırlandı — pencere toplamları yeniden başladı."
+                                    .into(),
+                            );
                             self.rolling.clear();
                             self.excluded = (0, 0);
                         } else {
@@ -390,18 +422,29 @@ impl App {
 
         // ---- 3) Process taraması 2 sn'de bir (pencere gizliyken 5 sn)
         let scan_every = Duration::from_secs(if self.hidden { 5 } else { 2 });
-        if self.last_process_scan.is_none_or(|t| now.duration_since(t) >= scan_every) {
+        if self
+            .last_process_scan
+            .is_none_or(|t| now.duration_since(t) >= scan_every)
+        {
             let list = process::snapshot(&mut self.process_system);
             self.set_processes(list);
             self.last_process_scan = Some(now);
         }
 
         // ---- 4) ETW → PID trafik
-        let alive: HashMap<u32, u64> = self.processes.iter().map(|p| (p.pid, p.start_time)).collect();
+        let alive: HashMap<u32, u64> = self
+            .processes
+            .iter()
+            .map(|p| (p.pid, p.start_time))
+            .collect();
         let (dead, deltas) = self.traffic.update(now, &self.etw.snapshot(), &alive);
         if self.cfg.persist_usage {
             for (pid, drx, dtx) in deltas {
-                let name = self.process(pid).map(|p| p.name.as_str()).unwrap_or("(sonlanan process)").to_string();
+                let name = self
+                    .process(pid)
+                    .map(|p| p.name.as_str())
+                    .unwrap_or("(sonlanan process)")
+                    .to_string();
                 self.usage.add_app(&name, drx, dtx);
             }
         }
@@ -419,7 +462,9 @@ impl App {
                 EtwStatus::Failed(e) => {
                     self.fallback_checked = true;
                     if cfg!(windows) {
-                        self.notice = Some(format!("ETW başlatılamadı ({e}); IP Helper yedeğine geçildi — yalnızca TCP sayılır."));
+                        self.notice = Some(format!(
+                            "ETW başlatılamadı ({e}); IP Helper yedeğine geçildi — yalnızca TCP sayılır."
+                        ));
                         iphelper::start(self.etw.clone());
                     }
                 }
@@ -429,7 +474,10 @@ impl App {
                         && self.physical_since_start > 2 * 1024 * 1024 =>
                 {
                     self.fallback_checked = true;
-                    self.notice = Some("ETW olay üretmiyor; IP Helper yedeğine geçildi — yalnızca TCP sayılır.".into());
+                    self.notice = Some(
+                        "ETW olay üretmiyor; IP Helper yedeğine geçildi — yalnızca TCP sayılır."
+                            .into(),
+                    );
                     etw::shutdown();
                     iphelper::start(self.etw.clone());
                 }
@@ -439,11 +487,15 @@ impl App {
         }
 
         // ---- 5) Otomatik hız testi
-        if self.cfg.speedtest_auto && now.duration_since(self.last_auto_check) >= Duration::from_secs(5) {
+        if self.cfg.speedtest_auto
+            && now.duration_since(self.last_auto_check) >= Duration::from_secs(5)
+        {
             self.last_auto_check = now;
             let interval = self.cfg.speedtest_interval_min * 60;
             let by_history = match self.speed.last() {
-                Some(last) => (chrono::Local::now().timestamp() - last.timestamp) as u64 >= interval,
+                Some(last) => {
+                    (chrono::Local::now().timestamp() - last.timestamp) as u64 >= interval
+                }
                 None => true,
             };
             let by_attempt = match self.last_auto_attempt {
@@ -486,7 +538,13 @@ impl App {
             }
             let used = self.usage.today().total() as f64;
             let limit = self.cfg.daily_quota_gb * 1024.0 * 1024.0 * 1024.0;
-            let level = if used >= limit { 100 } else if used >= limit * 0.8 { 80 } else { 0 };
+            let level = if used >= limit {
+                100
+            } else if used >= limit * 0.8 {
+                80
+            } else {
+                0
+            };
             if level > self.quota_notified.1 {
                 self.quota_notified.1 = level;
                 tray::notify(
@@ -499,20 +557,20 @@ impl App {
                 );
             }
         }
-        if let Some(last) = self.speed.last() {
-            if last.timestamp > self.last_speed_seen {
-                self.last_speed_seen = last.timestamp;
-                if self.cfg.speed_alert_mbps > 0.0 && last.download_mbps < self.cfg.speed_alert_mbps {
-                    tray::notify(
-                        "NexNWatch — Düşük hız",
-                        &format!(
-                            "İndirme {} (eşik {} Mbps), ping {:.0} ms.",
-                            crate::units::mbps(last.download_mbps),
-                            self.cfg.speed_alert_mbps,
-                            last.ping_ms
-                        ),
-                    );
-                }
+        if let Some(last) = self.speed.last()
+            && last.timestamp > self.last_speed_seen
+        {
+            self.last_speed_seen = last.timestamp;
+            if self.cfg.speed_alert_mbps > 0.0 && last.download_mbps < self.cfg.speed_alert_mbps {
+                tray::notify(
+                    "NexNWatch — Düşük hız",
+                    &format!(
+                        "İndirme {} (eşik {} Mbps), ping {:.0} ms.",
+                        crate::units::mbps(last.download_mbps),
+                        self.cfg.speed_alert_mbps,
+                        last.ping_ms
+                    ),
+                );
             }
         }
     }
@@ -520,7 +578,10 @@ impl App {
     fn show_window(&mut self) -> Task<Message> {
         self.hidden = false;
         match self.window_id {
-            Some(id) => Task::batch([window::set_mode(id, window::Mode::Windowed), window::gain_focus(id)]),
+            Some(id) => Task::batch([
+                window::set_mode(id, window::Mode::Windowed),
+                window::gain_focus(id),
+            ]),
             None => Task::none(),
         }
     }
@@ -540,11 +601,18 @@ fn start_minimized() -> bool {
 
 pub fn run() -> iced::Result {
     tray::init();
-    let icon = window::icon::from_rgba(include_bytes!("../assets/icon-64.rgba").to_vec(), 64, 64).ok();
+    let icon =
+        window::icon::from_rgba(include_bytes!("../assets/icon-64.rgba").to_vec(), 64, 64).ok();
     application(App::new, update, crate::ui::view)
         .title("NexNWatch | Gerçek Zamanlı Ağ İzleme")
         .subscription(subscription)
-        .theme(|_: &App| if theme::is_light() { Theme::Light } else { Theme::Dark })
+        .theme(|_: &App| {
+            if theme::is_light() {
+                Theme::Light
+            } else {
+                Theme::Dark
+            }
+        })
         .exit_on_close_request(false)
         .window(window::Settings {
             size: iced::Size::new(1480.0, 940.0),

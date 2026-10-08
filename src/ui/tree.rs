@@ -2,7 +2,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use iced::widget::{button, column, container, row, scrollable, text, Space};
+use iced::widget::{Space, button, column, container, row, scrollable, text};
 use iced::{Alignment, Background, Border, Color, Element, Length, Padding};
 
 use crate::app::{App, Message};
@@ -31,7 +31,9 @@ pub struct ProcessTree {
 pub fn children_map(app: &App) -> HashMap<u32, Vec<u32>> {
     let mut map: HashMap<u32, Vec<u32>> = HashMap::new();
     for proc_ in &app.processes {
-        let Some(ppid) = proc_.parent_pid else { continue };
+        let Some(ppid) = proc_.parent_pid else {
+            continue;
+        };
         if ppid == proc_.pid {
             continue;
         }
@@ -59,7 +61,10 @@ pub fn family_root(app: &App, pid: u32) -> u32 {
     while let Some(p) = app.process(cur) {
         let Some(ppid) = p.parent_pid else { break };
         match app.process(ppid) {
-            Some(parent) if parent.name.eq_ignore_ascii_case(&p.name) && parent.start_time <= p.start_time + 1 => {
+            Some(parent)
+                if parent.name.eq_ignore_ascii_case(&p.name)
+                    && parent.start_time <= p.start_time + 1 =>
+            {
                 cur = ppid;
             }
             _ => break,
@@ -113,8 +118,17 @@ fn walk(
     if !seen.insert(pid) || depth > 16 {
         return;
     }
-    let name = app.process(pid).map(|p| p.name.clone()).unwrap_or_else(|| format!("PID {pid}"));
-    out.push(TreeRow { depth, pid, name, stats: app.traffic.get(pid), last_child: last });
+    let name = app
+        .process(pid)
+        .map(|p| p.name.clone())
+        .unwrap_or_else(|| format!("PID {pid}"));
+    out.push(TreeRow {
+        depth,
+        pid,
+        name,
+        stats: app.traffic.get(pid),
+        last_child: last,
+    });
     if let Some(kids) = children.get(&pid) {
         let n = kids.len();
         for (i, k) in kids.iter().enumerate() {
@@ -138,11 +152,26 @@ pub fn panel(app: &App, max_height: f32) -> Element<'_, Message> {
     };
 
     let header = row![
-        text("PROCESS").size(10).color(p().muted).width(Length::Fill),
-        text("↓ HIZ").size(10).color(p().rx).width(Length::Fixed(82.0)),
-        text("↑ HIZ").size(10).color(p().tx).width(Length::Fixed(82.0)),
-        text("↓ TOPLAM").size(10).color(p().rx).width(Length::Fixed(78.0)),
-        text("↑ TOPLAM").size(10).color(p().tx).width(Length::Fixed(78.0)),
+        text("PROCESS")
+            .size(10)
+            .color(p().muted)
+            .width(Length::Fill),
+        text("↓ HIZ")
+            .size(10)
+            .color(p().rx)
+            .width(Length::Fixed(82.0)),
+        text("↑ HIZ")
+            .size(10)
+            .color(p().tx)
+            .width(Length::Fixed(82.0)),
+        text("↓ TOPLAM")
+            .size(10)
+            .color(p().rx)
+            .width(Length::Fixed(78.0)),
+        text("↑ TOPLAM")
+            .size(10)
+            .color(p().tx)
+            .width(Length::Fixed(78.0)),
     ]
     .spacing(6);
 
@@ -151,18 +180,43 @@ pub fn panel(app: &App, max_height: f32) -> Element<'_, Message> {
         let prefix = if r.depth == 0 {
             "▾ ".to_string()
         } else {
-            format!("{}{} ", "   ".repeat(r.depth - 1), if r.last_child { "└" } else { "├" })
+            format!(
+                "{}{} ",
+                "   ".repeat(r.depth - 1),
+                if r.last_child { "└" } else { "├" }
+            )
         };
         let active = r.stats.rx_per_sec + r.stats.tx_per_sec > 0.0;
-        let name_color = if r.depth == 0 { p().title } else if active { p().text } else { p().muted };
+        let name_color = if r.depth == 0 {
+            p().title
+        } else if active {
+            p().text
+        } else {
+            p().muted
+        };
         let pid = r.pid;
         let line = button(
             row![
-                text(format!("{prefix}{}  ({})", r.name, r.pid)).size(11).color(name_color).width(Length::Fill),
-                text(units::speed(r.stats.rx_per_sec, unit)).size(11).color(p().rx).width(Length::Fixed(82.0)),
-                text(units::speed(r.stats.tx_per_sec, unit)).size(11).color(p().tx).width(Length::Fixed(82.0)),
-                text(units::bytes(r.stats.rx_bytes)).size(11).color(p().text).width(Length::Fixed(78.0)),
-                text(units::bytes(r.stats.tx_bytes)).size(11).color(p().text).width(Length::Fixed(78.0)),
+                text(format!("{prefix}{}  ({})", r.name, r.pid))
+                    .size(11)
+                    .color(name_color)
+                    .width(Length::Fill),
+                text(units::speed(r.stats.rx_per_sec, unit))
+                    .size(11)
+                    .color(p().rx)
+                    .width(Length::Fixed(82.0)),
+                text(units::speed(r.stats.tx_per_sec, unit))
+                    .size(11)
+                    .color(p().tx)
+                    .width(Length::Fixed(82.0)),
+                text(units::bytes(r.stats.rx_bytes))
+                    .size(11)
+                    .color(p().text)
+                    .width(Length::Fixed(78.0)),
+                text(units::bytes(r.stats.tx_bytes))
+                    .size(11)
+                    .color(p().text)
+                    .width(Length::Fixed(78.0)),
             ]
             .spacing(6)
             .align_y(Alignment::Center),
@@ -179,7 +233,10 @@ pub fn panel(app: &App, max_height: f32) -> Element<'_, Message> {
                 Color::TRANSPARENT
             })),
             text_color: p().text,
-            border: Border { radius: 4.0.into(), ..Default::default() },
+            border: Border {
+                radius: 4.0.into(),
+                ..Default::default()
+            },
             ..Default::default()
         });
         lines = lines.push(line);
@@ -187,11 +244,26 @@ pub fn panel(app: &App, max_height: f32) -> Element<'_, Message> {
 
     let footer = container(
         row![
-            text(format!("TOPLAM AĞAÇ · {} process", tree.rows.len())).size(11).color(p().muted).width(Length::Fill),
-            text(format!("↓ {}", units::speed(tree.total.rx_per_sec, unit))).size(12).color(p().rx).width(Length::Fixed(82.0)),
-            text(format!("↑ {}", units::speed(tree.total.tx_per_sec, unit))).size(12).color(p().tx).width(Length::Fixed(82.0)),
-            text(units::bytes(tree.total.rx_bytes)).size(12).color(p().rx).width(Length::Fixed(78.0)),
-            text(units::bytes(tree.total.tx_bytes)).size(12).color(p().tx).width(Length::Fixed(78.0)),
+            text(format!("TOPLAM AĞAÇ · {} process", tree.rows.len()))
+                .size(11)
+                .color(p().muted)
+                .width(Length::Fill),
+            text(format!("↓ {}", units::speed(tree.total.rx_per_sec, unit)))
+                .size(12)
+                .color(p().rx)
+                .width(Length::Fixed(82.0)),
+            text(format!("↑ {}", units::speed(tree.total.tx_per_sec, unit)))
+                .size(12)
+                .color(p().tx)
+                .width(Length::Fixed(82.0)),
+            text(units::bytes(tree.total.rx_bytes))
+                .size(12)
+                .color(p().rx)
+                .width(Length::Fixed(78.0)),
+            text(units::bytes(tree.total.tx_bytes))
+                .size(12)
+                .color(p().tx)
+                .width(Length::Fixed(78.0)),
         ]
         .spacing(6)
         .align_y(Alignment::Center),

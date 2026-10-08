@@ -18,14 +18,17 @@ pub struct Resolver {
 impl Resolver {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel::<IpAddr>();
-        let cache: Arc<Mutex<HashMap<IpAddr, Option<String>>>> = Arc::new(Mutex::new(HashMap::new()));
+        let cache: Arc<Mutex<HashMap<IpAddr, Option<String>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
         let pending = Arc::new(Mutex::new(HashSet::new()));
         let (c, p) = (cache.clone(), pending.clone());
         std::thread::Builder::new()
             .name("rdns".into())
             .spawn(move || {
                 while let Ok(ip) = rx.recv() {
-                    let name = dns_lookup::lookup_addr(&ip).ok().filter(|n| n.parse::<IpAddr>().is_err());
+                    let name = dns_lookup::lookup_addr(&ip)
+                        .ok()
+                        .filter(|n| n.parse::<IpAddr>().is_err());
                     if let Ok(mut m) = c.lock() {
                         if m.len() >= MAX_CACHE {
                             m.clear();
@@ -49,10 +52,11 @@ impl Resolver {
         if let Some(v) = self.cache.lock().ok().and_then(|m| m.get(&ip).cloned()) {
             return v;
         }
-        if let Ok(mut p) = self.pending.lock() {
-            if p.len() < 256 && p.insert(ip) {
-                let _ = self.tx.send(ip);
-            }
+        if let Ok(mut p) = self.pending.lock()
+            && p.len() < 256
+            && p.insert(ip)
+        {
+            let _ = self.tx.send(ip);
         }
         None
     }

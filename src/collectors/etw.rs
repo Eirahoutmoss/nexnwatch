@@ -97,11 +97,18 @@ impl EtwHandle {
     }
 
     pub fn status(&self) -> EtwStatus {
-        self.status.lock().map(|s| s.clone()).unwrap_or(EtwStatus::Starting)
+        self.status
+            .lock()
+            .map(|s| s.clone())
+            .unwrap_or(EtwStatus::Starting)
     }
 
     pub fn source(&self) -> Source {
-        if self.fallback.load(Ordering::Relaxed) { Source::IpHelper } else { Source::Etw }
+        if self.fallback.load(Ordering::Relaxed) {
+            Source::IpHelper
+        } else {
+            Source::Etw
+        }
     }
 
     pub fn event_count(&self) -> u64 {
@@ -114,7 +121,10 @@ impl EtwHandle {
     }
 
     pub fn connections(&self) -> Vec<(ConnKey, ConnBytes)> {
-        self.conns.lock().map(|m| m.iter().map(|(k, v)| (*k, *v)).collect()).unwrap_or_default()
+        self.conns
+            .lock()
+            .map(|m| m.iter().map(|(k, v)| (*k, *v)).collect())
+            .unwrap_or_default()
     }
 
     /// Ölen process'lerin sayaçlarını ve bağlantılarını sil; eski bağlantıları buda.
@@ -124,10 +134,10 @@ impl EtwHandle {
                 m.remove(pid);
             }
         }
-        if let Ok(mut c) = self.conns.lock() {
-            if !pids.is_empty() {
-                c.retain(|k, _| !pids.contains(&k.pid));
-            }
+        if let Ok(mut c) = self.conns.lock()
+            && !pids.is_empty()
+        {
+            c.retain(|k, _| !pids.contains(&k.pid));
         }
     }
 
@@ -156,28 +166,32 @@ impl EtwHandle {
 
     /// Yerel birikimi paylaşılan haritalara aktar (ETW ve IP Helper ortak).
     #[cfg_attr(not(windows), allow(dead_code))]
-    pub(crate) fn merge(&self, pids: &mut HashMap<u32, PidBytes>, conns: &mut HashMap<ConnKey, ConnBytes>) {
-        if !pids.is_empty() {
-            if let Ok(mut m) = self.totals.lock() {
-                for (pid, b) in pids.drain() {
-                    let t = m.entry(pid).or_default();
-                    t.rx = t.rx.wrapping_add(b.rx);
-                    t.tx = t.tx.wrapping_add(b.tx);
-                }
+    pub(crate) fn merge(
+        &self,
+        pids: &mut HashMap<u32, PidBytes>,
+        conns: &mut HashMap<ConnKey, ConnBytes>,
+    ) {
+        if !pids.is_empty()
+            && let Ok(mut m) = self.totals.lock()
+        {
+            for (pid, b) in pids.drain() {
+                let t = m.entry(pid).or_default();
+                t.rx = t.rx.wrapping_add(b.rx);
+                t.tx = t.tx.wrapping_add(b.tx);
             }
         }
-        if !conns.is_empty() {
-            if let Ok(mut m) = self.conns.lock() {
-                for (k, b) in conns.drain() {
-                    match m.get_mut(&k) {
-                        Some(t) => {
-                            t.rx = t.rx.wrapping_add(b.rx);
-                            t.tx = t.tx.wrapping_add(b.tx);
-                            t.last_seen = b.last_seen;
-                        }
-                        None => {
-                            m.insert(k, b);
-                        }
+        if !conns.is_empty()
+            && let Ok(mut m) = self.conns.lock()
+        {
+            for (k, b) in conns.drain() {
+                match m.get_mut(&k) {
+                    Some(t) => {
+                        t.rx = t.rx.wrapping_add(b.rx);
+                        t.tx = t.tx.wrapping_add(b.tx);
+                        t.last_seen = b.last_seen;
+                    }
+                    None => {
+                        m.insert(k, b);
                     }
                 }
             }
@@ -200,7 +214,11 @@ pub(crate) fn accumulate(
     e.rx = e.rx.wrapping_add(rx);
     e.tx = e.tx.wrapping_add(tx);
     if let Some(k) = key {
-        let c = conns.entry(k).or_insert(ConnBytes { rx: 0, tx: 0, last_seen: now });
+        let c = conns.entry(k).or_insert(ConnBytes {
+            rx: 0,
+            tx: 0,
+            last_seen: now,
+        });
         c.rx = c.rx.wrapping_add(rx);
         c.tx = c.tx.wrapping_add(tx);
         c.last_seen = now;
@@ -213,11 +231,11 @@ mod imp {
     use std::net::{IpAddr, Ipv4Addr};
     use std::time::Duration;
 
+    use ferrisetw::EventRecord;
     use ferrisetw::parser::Parser;
     use ferrisetw::provider::{EventFilter, Provider};
     use ferrisetw::schema_locator::SchemaLocator;
-    use ferrisetw::trace::{stop_trace_by_name, UserTrace};
-    use ferrisetw::EventRecord;
+    use ferrisetw::trace::{UserTrace, stop_trace_by_name};
 
     const KERNEL_NETWORK_GUID: &str = "7DD42A49-5329-4832-8DFD-43D979153A88";
     const SEND_IDS: [u16; 4] = [10, 26, 42, 58];
@@ -266,10 +284,17 @@ mod imp {
             if !is_send && !RECV_IDS.contains(&id) {
                 return;
             }
-            let Ok(schema) = locator.event_schema(record) else { return };
+            let Ok(schema) = locator.event_schema(record) else {
+                return;
+            };
             let parser = Parser::create(record, &schema);
-            let pid: u32 = parser.try_parse("PID").unwrap_or_else(|_| record.process_id());
-            let size: u32 = parser.try_parse("size").or_else(|_| parser.try_parse("Size")).unwrap_or(0);
+            let pid: u32 = parser
+                .try_parse("PID")
+                .unwrap_or_else(|_| record.process_id());
+            let size: u32 = parser
+                .try_parse("size")
+                .or_else(|_| parser.try_parse("Size"))
+                .unwrap_or(0);
             if size == 0 {
                 return;
             }
@@ -278,7 +303,11 @@ mod imp {
             let key = match (ip(&parser, "daddr"), ip(&parser, "saddr")) {
                 (Some(d), Some(s)) => Some(ConnKey {
                     pid,
-                    proto: if UDP_IDS.contains(&id) { Proto::Udp } else { Proto::Tcp },
+                    proto: if UDP_IDS.contains(&id) {
+                        Proto::Udp
+                    } else {
+                        Proto::Tcp
+                    },
                     a: SocketAddr::new(d, port(&parser, "dport")),
                     b: SocketAddr::new(s, port(&parser, "sport")),
                 }),
@@ -349,8 +378,62 @@ mod imp {
 
     pub fn start() -> EtwHandle {
         let h = EtwHandle::new();
-        h.set_status(EtwStatus::Failed("ETW yalnızca Windows'ta kullanılabilir".into()));
+        if std::env::var_os("NEXNWATCH_DEMO").is_some() {
+            h.set_status(EtwStatus::Running);
+            let hc = h.clone();
+            std::thread::spawn(move || demo(hc));
+        } else {
+            h.set_status(EtwStatus::Failed(
+                "ETW yalnızca Windows'ta kullanılabilir".into(),
+            ));
+        }
         h
+    }
+
+    /// Geliştirme: arayüzü ETW olmadan denemek için sentetik trafik
+    /// (NEXNWATCH_DEMO=1). Gerçek PID'ler /proc'tan alınır.
+    fn demo(h: EtwHandle) {
+        use std::net::{IpAddr, Ipv4Addr};
+        let mut pids: Vec<u32> = std::fs::read_dir("/proc")
+            .map(|d| {
+                d.flatten()
+                    .filter_map(|e| e.file_name().to_str()?.parse().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        pids.sort();
+        pids.retain(|p| *p > 50);
+        let targets = [
+            ([140, 82, 112, 3], 443, Proto::Tcp),
+            ([1, 1, 1, 1], 443, Proto::Tcp),
+            ([8, 8, 8, 8], 53, Proto::Udp),
+            ([151, 101, 1, 69], 443, Proto::Tcp),
+            ([192, 168, 1, 1], 445, Proto::Tcp),
+        ];
+        let local = IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5));
+        let mut n: u64 = 0;
+        loop {
+            n += 1;
+            let mut pm = HashMap::new();
+            let mut cm = HashMap::new();
+            let now = Instant::now();
+            for (i, pid) in pids.iter().take(8).enumerate() {
+                let (ip, port, proto) = targets[i % targets.len()];
+                let wave = ((n as f64 / (3.0 + i as f64)).sin() + 1.2) as u64;
+                let rx = wave * (200_000 >> i);
+                let tx = wave * (30_000 >> i);
+                let key = ConnKey {
+                    pid: *pid,
+                    proto,
+                    a: SocketAddr::new(IpAddr::V4(Ipv4Addr::from(ip)), port),
+                    b: SocketAddr::new(local, 50000 + i as u16),
+                };
+                accumulate(&mut pm, &mut cm, Some(key), *pid, rx, tx, now);
+                h.events.fetch_add(1, Ordering::Relaxed);
+            }
+            h.merge(&mut pm, &mut cm);
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
     }
 
     pub fn shutdown() {}

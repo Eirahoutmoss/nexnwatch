@@ -10,7 +10,7 @@ pub mod settings;
 pub mod speed;
 pub mod tree;
 
-use iced::widget::{button, column, container, row, scrollable, text, Space};
+use iced::widget::{Space, button, column, container, row, scrollable, text};
 use iced::{Alignment, Background, Border, Color, Element, Length, Padding};
 
 use crate::app::{App, Message, Page};
@@ -44,7 +44,9 @@ pub fn view(app: &App) -> Element<'_, Message> {
             .style(|_| panel_style(p().panel_alt, p().warn, 6.0)),
         );
     }
-    body = body.push(scrollable(container(page).padding(Padding::from([0_u16, 4_u16]))).height(Length::Fill));
+    body = body.push(
+        scrollable(container(page).padding(Padding::from([0_u16, 4_u16]))).height(Length::Fill),
+    );
 
     container(body.padding(Padding::from([12_u16, 16_u16])))
         .width(Length::Fill)
@@ -61,7 +63,10 @@ fn header(app: &App) -> Element<'_, Message> {
     let logo = row![
         text("◖◉").size(26).color(p().accent),
         column![
-            row![text("NexN").size(24).color(p().title), text("Watch").size(24).color(p().accent)],
+            row![
+                text("NexN").size(24).color(p().title),
+                text("Watch").size(24).color(p().accent)
+            ],
             text("AĞINI GÖR, KONTROL SENDE").size(8).color(p().muted),
         ]
         .spacing(0),
@@ -125,7 +130,15 @@ fn nav_button(label: &str, page: Page, current: Page) -> Element<'_, Message> {
                     Color::TRANSPARENT
                 })),
                 text_color: if active { Color::WHITE } else { p().text },
-                border: Border { color: if active { p().accent } else { Color::TRANSPARENT }, width: 1.0, radius: 6.0.into() },
+                border: Border {
+                    color: if active {
+                        p().accent
+                    } else {
+                        Color::TRANSPARENT
+                    },
+                    width: 1.0,
+                    radius: 6.0.into(),
+                },
                 ..Default::default()
             }
         })
@@ -140,13 +153,21 @@ pub fn panel_style(background: Color, border_color: Color, radius: f32) -> conta
     container::Style {
         background: Some(Background::Color(background)),
         text_color: Some(p().text),
-        border: Border { color: border_color, width: 1.0, radius: radius.into() },
+        border: Border {
+            color: border_color,
+            width: 1.0,
+            radius: radius.into(),
+        },
         ..Default::default()
     }
 }
 
 /// Başlıklı panel kartı.
-pub fn card<'a>(title: &str, subtitle: &str, content: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
+pub fn card<'a>(
+    title: &str,
+    subtitle: &str,
+    content: impl Into<Element<'a, Message>>,
+) -> Element<'a, Message> {
     card_with(title, subtitle, Space::new(), content)
 }
 
@@ -163,7 +184,8 @@ pub fn card_with<'a>(
     }
     container(
         column![
-            row![head, Space::new().width(Length::Fill), trailing.into()].align_y(Alignment::Center),
+            row![head, Space::new().width(Length::Fill), trailing.into()]
+                .align_y(Alignment::Center),
             content.into(),
         ]
         .spacing(10),
@@ -189,7 +211,11 @@ pub fn chip<'a>(label: String, active: bool, msg: Message) -> Element<'a, Messag
                     p().panel_alt
                 })),
                 text_color: if active { Color::WHITE } else { p().text },
-                border: Border { color: if active { p().accent } else { p().border }, width: 1.0, radius: 5.0.into() },
+                border: Border {
+                    color: if active { p().accent } else { p().border },
+                    width: 1.0,
+                    radius: 5.0.into(),
+                },
                 ..Default::default()
             }
         })
@@ -203,7 +229,11 @@ pub fn small_button<'a>(label: &str, msg: Message, primary: bool) -> Element<'a,
         .style(move |_, status| {
             let hovered = matches!(status, button::Status::Hovered);
             let bg = if primary {
-                if hovered { p().accent } else { p().accent_strong }
+                if hovered {
+                    p().accent
+                } else {
+                    p().accent_strong
+                }
             } else if hovered {
                 p().selected
             } else {
@@ -212,7 +242,11 @@ pub fn small_button<'a>(label: &str, msg: Message, primary: bool) -> Element<'a,
             button::Style {
                 background: Some(Background::Color(bg)),
                 text_color: if primary { Color::WHITE } else { p().text },
-                border: Border { color: if primary { p().accent } else { p().border }, width: 1.0, radius: 6.0.into() },
+                border: Border {
+                    color: if primary { p().accent } else { p().border },
+                    width: 1.0,
+                    radius: 6.0.into(),
+                },
                 ..Default::default()
             }
         })
@@ -222,7 +256,10 @@ pub fn small_button<'a>(label: &str, msg: Message, primary: bool) -> Element<'a,
 /// Etiket : değer satırı.
 pub fn info_row<'a>(label: &str, value: String) -> Element<'a, Message> {
     row![
-        text(label.to_string()).size(11).color(p().muted).width(Length::Fixed(92.0)),
+        text(label.to_string())
+            .size(11)
+            .color(p().muted)
+            .width(Length::Fixed(92.0)),
         text(value).size(11).color(p().text),
     ]
     .spacing(6)
@@ -230,7 +267,13 @@ pub fn info_row<'a>(label: &str, value: String) -> Element<'a, Message> {
 }
 
 /// Büyük metrik kutusu (RX / TX).
-pub fn metric<'a>(arrow: &str, label: &str, value: String, color: Color, foot: String) -> Element<'a, Message> {
+pub fn metric<'a>(
+    arrow: &str,
+    label: &str,
+    value: String,
+    color: Color,
+    foot: String,
+) -> Element<'a, Message> {
     container(
         row![
             text(arrow.to_string()).size(34).color(color),
@@ -252,7 +295,11 @@ pub fn metric<'a>(arrow: &str, label: &str, value: String, color: Color, foot: S
 
 /// Tablo başlık hücresi.
 pub fn th<'a>(label: &str, width: Length) -> Element<'a, Message> {
-    text(label.to_string()).size(10).color(p().muted).width(width).into()
+    text(label.to_string())
+        .size(10)
+        .color(p().muted)
+        .width(width)
+        .into()
 }
 
 /// Oransal yatay çubuk (0..1).
@@ -266,7 +313,14 @@ pub fn bar<'a>(fraction: f32, color: Color) -> Element<'a, Message> {
             container(Space::new())
                 .width(Length::FillPortion(filled))
                 .height(3)
-                .style(move |_| container::Style { background: Some(Background::Color(color)), border: Border { radius: 2.0.into(), ..Default::default() }, ..Default::default() }),
+                .style(move |_| container::Style {
+                    background: Some(Background::Color(color)),
+                    border: Border {
+                        radius: 2.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
         );
     }
     if rest > 0 {

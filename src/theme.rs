@@ -27,7 +27,12 @@ pub struct Palette {
 }
 
 const fn rgb(r: u8, g: u8, b: u8) -> Color {
-    Color { r: r as f32 / 255.0, g: g as f32 / 255.0, b: b as f32 / 255.0, a: 1.0 }
+    Color {
+        r: r as f32 / 255.0,
+        g: g as f32 / 255.0,
+        b: b as f32 / 255.0,
+        a: 1.0,
+    }
 }
 
 pub const DARK: Palette = Palette {
