@@ -6,6 +6,7 @@ mod config;
 mod paths;
 mod state;
 mod theme;
+mod tray;
 mod ui;
 mod units;
 mod workers;

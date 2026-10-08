@@ -2,6 +2,7 @@
 
 pub mod adapters;
 pub mod chart;
+pub mod connections;
 pub mod dashboard;
 pub mod processes;
 pub mod reports;
@@ -13,7 +14,7 @@ use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Alignment, Background, Border, Color, Element, Length, Padding};
 
 use crate::app::{App, Message, Page};
-use crate::collectors::etw::EtwStatus;
+use crate::collectors::etw::{EtwStatus, Source};
 use crate::theme::p;
 
 pub fn view(app: &App) -> Element<'_, Message> {
@@ -78,10 +79,11 @@ fn header(app: &App) -> Element<'_, Message> {
     ]
     .spacing(4);
 
-    let (etw_label, etw_color) = match app.etw.status() {
-        EtwStatus::Running => ("● ETW aktif", p().good),
-        EtwStatus::Starting => ("● ETW başlıyor", p().warn),
-        EtwStatus::Failed(_) => ("● ETW kapalı", p().bad),
+    let (etw_label, etw_color) = match (app.etw.source(), app.etw.status()) {
+        (Source::IpHelper, _) => ("● Yedek: IP Helper", p().warn),
+        (_, EtwStatus::Running) => ("● ETW aktif", p().good),
+        (_, EtwStatus::Starting) => ("● ETW başlıyor", p().warn),
+        (_, EtwStatus::Failed(_)) => ("● ETW kapalı", p().bad),
     };
     let speed_badge: Element<'_, Message> = if app.speed.is_running() {
         text("⚡ Hız testi sürüyor").size(10).color(p().warn).into()

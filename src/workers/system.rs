@@ -12,7 +12,7 @@ pub fn set_autostart(enable: bool) -> Result<(), String> {
     if enable {
         cmd.args([
             "/Create", "/F", "/TN", "NexNWatch", "/SC", "ONLOGON", "/RL", "HIGHEST", "/TR",
-            &format!("\"{}\"", exe.display()),
+            &format!("\"{}\" --minimized", exe.display()),
         ]);
     } else {
         cmd.args(["/Delete", "/F", "/TN", "NexNWatch"]);

@@ -76,6 +76,38 @@ pub fn view(app: &App) -> Element<'_, Message> {
         .spacing(14),
     );
 
+    let quota = row([0.0f64, 1.0, 5.0, 10.0, 25.0, 50.0].iter().map(|g| {
+        let label = if *g == 0.0 { "Kapalı".to_string() } else { format!("{g:.0} GB") };
+        chip(label, (c.daily_quota_gb - g).abs() < 0.01, Message::SetQuota(*g))
+    }))
+    .spacing(4);
+    let speed_alert = row([0.0f64, 10.0, 25.0, 50.0, 100.0, 250.0].iter().map(|m| {
+        let label = if *m == 0.0 { "Kapalı".to_string() } else { format!("< {m:.0} Mbps") };
+        chip(label, (c.speed_alert_mbps - m).abs() < 0.01, Message::SetSpeedAlert(*m))
+    }))
+    .spacing(4);
+    let tray_note = if crate::tray::available() {
+        "Kapat düğmesi uygulamayı tepsiye gizler; çıkmak için tepsi menüsünden \"Çıkış\"."
+    } else {
+        "Sistem tepsisi bu platformda yok; kapat düğmesi uygulamadan çıkar."
+    };
+
+    let alerts = card(
+        "Tepsi ve Bildirimler",
+        "",
+        column![
+            setting("Kapatınca tepsiye küçült", tray_note, toggler(c.close_to_tray).on_toggle(Message::SetCloseToTray)),
+            setting(
+                "Windows bildirimleri",
+                "Kota aşımı ve düşük hız uyarıları",
+                toggler(c.notifications).on_toggle(Message::SetNotifications),
+            ),
+            setting("Günlük kota", "Bugünkü toplam bu değerin %80'ine ve %100'üne ulaşınca bildir", quota),
+            setting("Düşük hız uyarısı", "Hız testinde indirme bu değerin altında kalırsa bildir", speed_alert),
+        ]
+        .spacing(14),
+    );
+
     let data = card(
         "Veri ve Sistem",
         "",
@@ -119,5 +151,5 @@ pub fn view(app: &App) -> Element<'_, Message> {
         .spacing(6),
     );
 
-    column![general, speed, data, about].spacing(10).into()
+    column![general, speed, alerts, data, about].spacing(10).into()
 }

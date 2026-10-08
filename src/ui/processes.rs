@@ -99,17 +99,21 @@ pub fn view(app: &App) -> Element<'_, Message> {
         );
     }
 
-    let etw_line = match app.etw.status() {
-        EtwStatus::Running if app.etw.event_count() == 0 && app.started.elapsed().as_secs() > 20 => {
-            "ETW oturumu açık ama henüz olay gelmedi — yönetici olarak çalıştığından ve güvenlik yazılımının ETW'yi engellemediğinden emin olun.".into()
+    let etw_line = if app.etw.source() == crate::collectors::etw::Source::IpHelper {
+        format!("IP Helper yedeği aktif (yalnızca TCP) · {} process trafik yaptı", app.traffic.len())
+    } else {
+        match app.etw.status() {
+            EtwStatus::Running if app.etw.event_count() == 0 && app.started.elapsed().as_secs() > 20 => {
+                "ETW oturumu açık ama henüz olay gelmedi — yönetici olarak çalıştığından ve güvenlik yazılımının ETW'yi engellemediğinden emin olun.".into()
+            }
+            EtwStatus::Running => format!(
+                "ETW Kernel-Network aktif · {} olay işlendi · {} process trafik yaptı",
+                app.etw.event_count(),
+                app.traffic.len()
+            ),
+            EtwStatus::Starting => "ETW oturumu başlatılıyor…".into(),
+            EtwStatus::Failed(e) => format!("ETW kullanılamıyor: {e}. Uygulamayı yönetici olarak çalıştırın."),
         }
-        EtwStatus::Running => format!(
-            "ETW Kernel-Network aktif · {} olay işlendi · {} process trafik yaptı",
-            app.etw.event_count(),
-            app.traffic.len()
-        ),
-        EtwStatus::Starting => "ETW oturumu başlatılıyor…".into(),
-        EtwStatus::Failed(e) => format!("ETW kullanılamıyor: {e}. Uygulamayı yönetici olarak çalıştırın."),
     };
 
     let table = card(
@@ -124,9 +128,13 @@ pub fn view(app: &App) -> Element<'_, Message> {
         tree::panel(app, 520.0),
     );
 
-    row![
-        iced::widget::container(table).width(Length::FillPortion(11)),
-        iced::widget::container(tree).width(Length::FillPortion(9)),
+    column![
+        row![
+            iced::widget::container(table).width(Length::FillPortion(11)),
+            iced::widget::container(tree).width(Length::FillPortion(9)),
+        ]
+        .spacing(10),
+        crate::ui::connections::view(app),
     ]
     .spacing(10)
     .into()

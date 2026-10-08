@@ -1,17 +1,20 @@
 //! Merkezi uygulama durumu, mesajlar ve tick mantığı.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::net::IpAddr;
 use std::time::{Duration, Instant};
 
 use iced::{application, window, Subscription, Task, Theme};
 
-use crate::collectors::etw::{self, EtwHandle};
-use crate::collectors::{nic, process};
+use crate::collectors::etw::{self, EtwHandle, EtwStatus};
+use crate::collectors::rdns::Resolver;
+use crate::collectors::{iphelper, nic, process};
 use crate::config::{Config, ThemeMode};
 use crate::state::rolling_window::{RollingWindow, Sample};
 use crate::state::traffic_map::TrafficMap;
 use crate::state::usage_store::UsageStore;
 use crate::theme;
+use crate::tray::{self, TrayAction};
 use crate::units::DisplayUnit;
 use crate::workers::speedtest::SpeedTester;
 use crate::workers::system;
@@ -59,7 +62,15 @@ pub enum Message {
     OpenDataFolder,
     DuplexLoaded(HashMap<u32, bool>),
     DismissNotice,
-    CloseRequested,
+    CloseRequested(window::Id),
+    WindowId(Option<window::Id>),
+    TrayPoll,
+    SetCloseToTray(bool),
+    SetNotifications(bool),
+    SetQuota(f64),
+    SetSpeedAlert(f64),
+    ConnFilter(String),
+    ConnScopeAll(bool),
 }
 
 /// Bir adaptörün anlık hızı (sidebar ve adaptör sayfası için).
@@ -117,6 +128,24 @@ pub struct App {
     last_usage_save: Instant,
 
     pub notice: Option<String>,
+
+    // --- bağlantılar
+    pub resolver: Resolver,
+    pub local_ips: HashSet<IpAddr>,
+    pub conn_filter: String,
+    pub conn_scope_all: bool,
+    last_conn_prune: Instant,
+
+    // --- yedek kaynak
+    fallback_checked: bool,
+    physical_since_start: u64,
+
+    // --- pencere / tepsi / bildirim
+    pub window_id: Option<window::Id>,
+    hidden: bool,
+    tray_hint_shown: bool,
+    quota_notified: (String, u8),
+    last_speed_seen: i64,
 }
 
 pub const ALL_LABEL: &str = "Tüm Adaptörler";
@@ -176,8 +205,22 @@ impl App {
             usage: UsageStore::load(),
             last_usage_save: Instant::now(),
             notice: None,
+            resolver: Resolver::new(),
+            local_ips: HashSet::new(),
+            conn_filter: String::new(),
+            conn_scope_all: false,
+            last_conn_prune: Instant::now(),
+            fallback_checked: false,
+            physical_since_start: 0,
+            window_id: None,
+            hidden: start_minimized(),
+            tray_hint_shown: false,
+            quota_notified: (String::new(), 0),
+            last_speed_seen: 0,
             cfg,
         };
+        app.last_speed_seen = app.speed.last().map(|r| r.timestamp).unwrap_or(0);
+        app.update_local_ips();
         app.set_processes(processes);
 
         // Duplex bilgisi (PowerShell) arka planda.
@@ -185,7 +228,16 @@ impl App {
             async { tokio::task::spawn_blocking(nic::duplex_map).await.unwrap_or_default() },
             Message::DuplexLoaded,
         );
-        (app, duplex)
+        (app, Task::batch([duplex, window::latest().map(Message::WindowId)]))
+    }
+
+    fn update_local_ips(&mut self) {
+        self.local_ips = self
+            .adapters
+            .iter()
+            .flat_map(|a| a.ipv4.iter().chain(a.ipv6.iter()))
+            .filter_map(|s| s.split('/').next().and_then(|ip| ip.split('%').next()).and_then(|ip| ip.parse().ok()))
+            .collect();
     }
 
     pub fn selected_adapter(&self) -> Option<&nic::AdapterInfo> {
@@ -238,6 +290,7 @@ impl App {
         match nic::list_adapters() {
             Ok(list) => {
                 self.adapters = list;
+                self.update_local_ips();
                 if let Some(i) = self.selected {
                     if !self.adapters.iter().any(|a| a.index == i) {
                         self.notice = Some("Seçili adaptör kayboldu; tüm adaptörlere geçildi.".into());
@@ -283,6 +336,7 @@ impl App {
                 if self.cfg.persist_usage {
                     self.usage.add(physical_delta.0, physical_delta.1);
                 }
+                self.physical_since_start += physical_delta.0 + physical_delta.1;
 
                 // Seçili kaynak: tek adaptör ya da fiziksel adaptörlerin toplamı.
                 let raw = match self.selected {
@@ -334,8 +388,9 @@ impl App {
             self.refresh_adapters();
         }
 
-        // ---- 3) Process taraması 2 sn'de bir
-        if self.last_process_scan.is_none_or(|t| now.duration_since(t) >= Duration::from_secs(2)) {
+        // ---- 3) Process taraması 2 sn'de bir (pencere gizliyken 5 sn)
+        let scan_every = Duration::from_secs(if self.hidden { 5 } else { 2 });
+        if self.last_process_scan.is_none_or(|t| now.duration_since(t) >= scan_every) {
             let list = process::snapshot(&mut self.process_system);
             self.set_processes(list);
             self.last_process_scan = Some(now);
@@ -343,9 +398,44 @@ impl App {
 
         // ---- 4) ETW → PID trafik
         let alive: HashMap<u32, u64> = self.processes.iter().map(|p| (p.pid, p.start_time)).collect();
-        let dead = self.traffic.update(now, &self.etw.snapshot(), &alive);
+        let (dead, deltas) = self.traffic.update(now, &self.etw.snapshot(), &alive);
+        if self.cfg.persist_usage {
+            for (pid, drx, dtx) in deltas {
+                let name = self.process(pid).map(|p| p.name.as_str()).unwrap_or("(sonlanan process)").to_string();
+                self.usage.add_app(&name, drx, dtx);
+            }
+        }
         if !dead.is_empty() {
             self.etw.forget(&dead);
+        }
+        if now.duration_since(self.last_conn_prune) >= Duration::from_secs(30) {
+            self.etw.prune_connections(Duration::from_secs(15 * 60));
+            self.last_conn_prune = now;
+        }
+
+        // ---- 4b) ETW yedeği: başlatılamadıysa ya da trafik varken olay gelmiyorsa
+        if !self.fallback_checked {
+            match self.etw.status() {
+                EtwStatus::Failed(e) => {
+                    self.fallback_checked = true;
+                    if cfg!(windows) {
+                        self.notice = Some(format!("ETW başlatılamadı ({e}); IP Helper yedeğine geçildi — yalnızca TCP sayılır."));
+                        iphelper::start(self.etw.clone());
+                    }
+                }
+                EtwStatus::Running
+                    if self.etw.event_count() == 0
+                        && now.duration_since(self.started) >= Duration::from_secs(25)
+                        && self.physical_since_start > 2 * 1024 * 1024 =>
+                {
+                    self.fallback_checked = true;
+                    self.notice = Some("ETW olay üretmiyor; IP Helper yedeğine geçildi — yalnızca TCP sayılır.".into());
+                    etw::shutdown();
+                    iphelper::start(self.etw.clone());
+                }
+                EtwStatus::Running if self.etw.event_count() > 0 => self.fallback_checked = true,
+                _ => {}
+            }
         }
 
         // ---- 5) Otomatik hız testi
@@ -367,10 +457,71 @@ impl App {
             }
         }
 
+        // ---- 5b) Bildirimler: kota ve düşük hız
+        self.check_alerts();
+
+        // ---- 5c) Tepsi ipucu
+        tray::set_tooltip(&format!(
+            "NexNWatch — {}\n↓ {}  ↑ {}",
+            self.selected_label(),
+            crate::units::speed(self.rx_speed, self.cfg.unit),
+            crate::units::speed(self.tx_speed, self.cfg.unit)
+        ));
+
         // ---- 6) Kalıcı sayaç: dakikada bir diske
         if now.duration_since(self.last_usage_save) >= Duration::from_secs(60) {
             self.usage.save();
             self.last_usage_save = now;
+        }
+    }
+
+    fn check_alerts(&mut self) {
+        if !self.cfg.notifications {
+            return;
+        }
+        if self.cfg.daily_quota_gb > 0.0 {
+            let day = chrono::Local::now().format("%Y-%m-%d").to_string();
+            if self.quota_notified.0 != day {
+                self.quota_notified = (day, 0);
+            }
+            let used = self.usage.today().total() as f64;
+            let limit = self.cfg.daily_quota_gb * 1024.0 * 1024.0 * 1024.0;
+            let level = if used >= limit { 100 } else if used >= limit * 0.8 { 80 } else { 0 };
+            if level > self.quota_notified.1 {
+                self.quota_notified.1 = level;
+                tray::notify(
+                    "NexNWatch — Günlük kota",
+                    &format!(
+                        "Bugün {} kullanıldı (kotanın %{level}'i: {} GB).",
+                        crate::units::bytes(used as u64),
+                        self.cfg.daily_quota_gb
+                    ),
+                );
+            }
+        }
+        if let Some(last) = self.speed.last() {
+            if last.timestamp > self.last_speed_seen {
+                self.last_speed_seen = last.timestamp;
+                if self.cfg.speed_alert_mbps > 0.0 && last.download_mbps < self.cfg.speed_alert_mbps {
+                    tray::notify(
+                        "NexNWatch — Düşük hız",
+                        &format!(
+                            "İndirme {} (eşik {} Mbps), ping {:.0} ms.",
+                            crate::units::mbps(last.download_mbps),
+                            self.cfg.speed_alert_mbps,
+                            last.ping_ms
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    fn show_window(&mut self) -> Task<Message> {
+        self.hidden = false;
+        match self.window_id {
+            Some(id) => Task::batch([window::set_mode(id, window::Mode::Windowed), window::gain_focus(id)]),
+            None => Task::none(),
         }
     }
 
@@ -382,7 +533,14 @@ impl App {
     }
 }
 
+/// `--minimized` ile başlatıldıysa (Windows açılışı) pencere gizli açılır.
+fn start_minimized() -> bool {
+    std::env::args().any(|a| a == "--minimized") && tray::available()
+}
+
 pub fn run() -> iced::Result {
+    tray::init();
+    let icon = window::icon::from_rgba(include_bytes!("../assets/icon-64.rgba").to_vec(), 64, 64).ok();
     application(App::new, update, crate::ui::view)
         .title("NexNWatch | Gerçek Zamanlı Ağ İzleme")
         .subscription(subscription)
@@ -391,6 +549,8 @@ pub fn run() -> iced::Result {
         .window(window::Settings {
             size: iced::Size::new(1480.0, 940.0),
             min_size: Some(iced::Size::new(1180.0, 720.0)),
+            visible: !start_minimized(),
+            icon,
             ..Default::default()
         })
         .run()
@@ -399,7 +559,12 @@ pub fn run() -> iced::Result {
 fn subscription(app: &App) -> Subscription<Message> {
     Subscription::batch([
         iced::time::every(app.tick_period()).map(Message::Tick),
-        window::close_requests().map(|_| Message::CloseRequested),
+        window::close_requests().map(Message::CloseRequested),
+        if tray::available() {
+            iced::time::every(Duration::from_millis(250)).map(|_| Message::TrayPoll)
+        } else {
+            Subscription::none()
+        },
     ])
 }
 
@@ -482,10 +647,60 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
         }
         Message::DuplexLoaded(map) => app.duplex = map,
         Message::DismissNotice => app.notice = None,
-        Message::CloseRequested => {
+        Message::CloseRequested(id) => {
+            app.window_id = Some(id);
+            if app.cfg.close_to_tray && tray::available() {
+                app.hidden = true;
+                if !app.tray_hint_shown && app.cfg.notifications {
+                    app.tray_hint_shown = true;
+                    tray::notify(
+                        "NexNWatch arka planda",
+                        "İzleme sürüyor. Tepsi simgesine çift tıklayarak açabilir, sağ tıklayıp çıkabilirsiniz.",
+                    );
+                }
+                return window::set_mode(id, window::Mode::Hidden);
+            }
             app.shutdown();
             return iced::exit();
         }
+        Message::WindowId(id) => {
+            if app.window_id.is_none() {
+                app.window_id = id;
+            }
+        }
+        Message::TrayPoll => {
+            let mut tasks = Vec::new();
+            for action in tray::poll() {
+                match action {
+                    TrayAction::Show => tasks.push(app.show_window()),
+                    TrayAction::SpeedTest => app.speed.start(false),
+                    TrayAction::Quit => {
+                        app.shutdown();
+                        return iced::exit();
+                    }
+                }
+            }
+            return Task::batch(tasks);
+        }
+        Message::SetCloseToTray(v) => {
+            app.cfg.close_to_tray = v;
+            app.cfg.save();
+        }
+        Message::SetNotifications(v) => {
+            app.cfg.notifications = v;
+            app.cfg.save();
+        }
+        Message::SetQuota(gb) => {
+            app.cfg.daily_quota_gb = gb;
+            app.quota_notified = (String::new(), 0);
+            app.cfg.save();
+        }
+        Message::SetSpeedAlert(m) => {
+            app.cfg.speed_alert_mbps = m;
+            app.cfg.save();
+        }
+        Message::ConnFilter(s) => app.conn_filter = s,
+        Message::ConnScopeAll(v) => app.conn_scope_all = v,
     }
     Task::none()
 }

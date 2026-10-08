@@ -32,6 +32,14 @@ pub struct Config {
     pub virtual_group_open: bool,
     /// Son seçilen adaptör (arayüz adı).
     pub last_adapter: Option<String>,
+    /// Pencere kapatılınca sistem tepsisine küçült (izleme sürer).
+    pub close_to_tray: bool,
+    /// Windows bildirimleri.
+    pub notifications: bool,
+    /// Günlük kota (GB). 0 = kapalı. %80 ve %100'de bildirim.
+    pub daily_quota_gb: f64,
+    /// Hız testinde indirme bu değerin (Mbps) altındaysa bildirim. 0 = kapalı.
+    pub speed_alert_mbps: f64,
 }
 
 impl Default for Config {
@@ -47,6 +55,10 @@ impl Default for Config {
             autostart: false,
             virtual_group_open: false,
             last_adapter: None,
+            close_to_tray: true,
+            notifications: true,
+            daily_quota_gb: 0.0,
+            speed_alert_mbps: 0.0,
         }
     }
 }
@@ -88,5 +100,7 @@ impl Config {
         self.tick_ms = self.tick_ms.clamp(250, 10_000);
         self.speedtest_interval_min = self.speedtest_interval_min.clamp(1, 24 * 60);
         self.window_minutes = self.window_minutes.clamp(10, 120);
+        self.daily_quota_gb = self.daily_quota_gb.clamp(0.0, 100_000.0);
+        self.speed_alert_mbps = self.speed_alert_mbps.clamp(0.0, 100_000.0);
     }
 }
