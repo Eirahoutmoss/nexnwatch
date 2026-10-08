@@ -367,11 +367,11 @@ mod imp {
 
     /// ETW oturumunu kapat (yedek kaynağa geçerken ya da çıkışta).
     pub fn shutdown() {
-        if let Ok(mut t) = TRACE.lock() {
-            if let Some(trace) = t.take() {
-                let _ = trace.stop();
-                tracing::info!("ETW oturumu kapatıldı");
-            }
+        if let Ok(mut t) = TRACE.lock()
+            && let Some(trace) = t.take()
+        {
+            let _ = trace.stop();
+            tracing::info!("ETW oturumu kapatıldı");
         }
         let _ = stop_trace_by_name(SESSION_NAME);
     }

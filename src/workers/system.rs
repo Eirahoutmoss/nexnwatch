@@ -64,10 +64,10 @@ pub fn crash_dialog(message: &str) {
             MB_YESNO | MB_ICONERROR | MB_TOPMOST,
         )
     };
-    if answer == IDYES {
-        if let Ok(exe) = std::env::current_exe() {
-            let _ = std::process::Command::new(exe).spawn();
-        }
+    if answer == IDYES
+        && let Ok(exe) = std::env::current_exe()
+    {
+        let _ = std::process::Command::new(exe).spawn();
     }
 }
 
