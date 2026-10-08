@@ -27,6 +27,9 @@ impl DayUsage {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct UsageStore {
     pub days: BTreeMap<String, DayUsage>,
+    /// Gün → uygulama adı → kullanım (ETW/IP Helper process trafiğinden).
+    #[serde(default)]
+    pub apps: BTreeMap<String, BTreeMap<String, DayUsage>>,
     #[serde(skip)]
     dirty: bool,
 }
@@ -50,6 +53,8 @@ impl UsageStore {
         // 400 günden eskiyi buda.
         let cutoff = key(Local::now().date_naive() - ChronoDuration::days(400));
         self.days.retain(|k, _| *k >= cutoff);
+        let app_cutoff = key(Local::now().date_naive() - ChronoDuration::days(92));
+        self.apps.retain(|k, _| *k >= app_cutoff);
         if let Ok(bytes) = serde_json::to_vec_pretty(self) {
             if let Err(e) = paths::write_atomic(&paths::usage_file(), &bytes) {
                 tracing::warn!("usage.json yazılamadı: {e}");
@@ -66,6 +71,43 @@ impl UsageStore {
         let k = key(Local::now().date_naive());
         self.days.entry(k).or_default().add(DayUsage { rx, tx });
         self.dirty = true;
+    }
+
+    /// Uygulama bazlı kullanım ekle (ad küçük harfe çevrilmez; görünen ad korunur).
+    pub fn add_app(&mut self, name: &str, rx: u64, tx: u64) {
+        if rx == 0 && tx == 0 {
+            return;
+        }
+        let k = key(Local::now().date_naive());
+        self.apps
+            .entry(k)
+            .or_default()
+            .entry(name.to_string())
+            .or_default()
+            .add(DayUsage { rx, tx });
+        self.dirty = true;
+    }
+
+    /// `from` gününden bugüne uygulama toplamları, en çoktan aza.
+    fn apps_from(&self, from: NaiveDate) -> Vec<(String, DayUsage)> {
+        let mut map: BTreeMap<String, DayUsage> = BTreeMap::new();
+        for (_, apps) in self.apps.range(key(from)..) {
+            for (name, u) in apps {
+                map.entry(name.clone()).or_default().add(*u);
+            }
+        }
+        let mut v: Vec<_> = map.into_iter().collect();
+        v.sort_by(|a, b| b.1.total().cmp(&a.1.total()));
+        v
+    }
+
+    pub fn apps_today(&self) -> Vec<(String, DayUsage)> {
+        self.apps_from(Local::now().date_naive())
+    }
+
+    pub fn apps_this_month(&self) -> Vec<(String, DayUsage)> {
+        let today = Local::now().date_naive();
+        self.apps_from(today.with_day(1).unwrap_or(today))
     }
 
     fn sum_from(&self, from: NaiveDate) -> DayUsage {

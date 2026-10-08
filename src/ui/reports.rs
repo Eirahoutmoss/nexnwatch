@@ -133,9 +133,42 @@ pub fn view(app: &App) -> Element<'_, Message> {
         proc_rows,
     );
 
+    let apps_card = |title: &str, list: Vec<(String, crate::state::usage_store::DayUsage)>| -> Element<'_, Message> {
+        let max = list.first().map(|(_, u)| u.total()).unwrap_or(1).max(1);
+        let mut rows = column![
+            row![th("UYGULAMA", Length::Fill), th("İNDİRME", w(84.0)), th("YÜKLEME", w(84.0)), th("TOPLAM", w(84.0))].spacing(6)
+        ]
+        .spacing(4);
+        if list.is_empty() {
+            rows = rows.push(text("Henüz kayıt yok.").size(11).color(p().muted));
+        }
+        for (name, u) in list.iter().take(20) {
+            rows = rows.push(
+                column![
+                    row![
+                        text(name.clone()).size(11).color(p().text).width(Length::Fill),
+                        text(units::bytes(u.rx)).size(11).color(p().rx).width(w(84.0)),
+                        text(units::bytes(u.tx)).size(11).color(p().tx).width(w(84.0)),
+                        text(units::bytes(u.total())).size(11).color(p().title).width(w(84.0)),
+                    ]
+                    .spacing(6),
+                    bar(u.total() as f32 / max as f32, p().accent_strong),
+                ]
+                .spacing(2),
+            );
+        }
+        card(title, "Uygulama adına göre · kalıcı", rows)
+    };
+    let apps_row = row![
+        apps_card("Uygulamalar — Bugün", app.usage.apps_today()),
+        apps_card("Uygulamalar — Bu Ay", app.usage.apps_this_month()),
+    ]
+    .spacing(10);
+
     column![
         summary,
         chart,
+        apps_row,
         row![
             iced::widget::container(daily).width(Length::FillPortion(3)),
             column![monthly, session].spacing(10).width(Length::FillPortion(2)),
