@@ -233,19 +233,6 @@ mod imp {
             .into_owned()
     }
 
-    unsafe fn pwstr(p: *const u16) -> String {
-        if p.is_null() {
-            return String::new();
-        }
-        let mut len = 0usize;
-        unsafe {
-            while *p.add(len) != 0 && len < 4096 {
-                len += 1;
-            }
-            wide(std::slice::from_raw_parts(p, len))
-        }
-    }
-
     fn mac(row: &MIB_IF_ROW2) -> String {
         let len = (row.PhysicalAddressLength as usize).min(row.PhysicalAddress.len());
         if len == 0 {
@@ -260,9 +247,9 @@ mod imp {
 
     fn status(row: &MIB_IF_ROW2) -> AdapterStatus {
         // IfOperStatusUp = 1, Down = 2; MediaConnectStateDisconnected = 2
-        match row.OperStatus as i32 {
+        match row.OperStatus {
             1 => AdapterStatus::Up,
-            2 if row.MediaConnectState as i32 == 2 => AdapterStatus::Disconnected,
+            2 if row.MediaConnectState == 2 => AdapterStatus::Disconnected,
             2 => AdapterStatus::Down,
             _ => AdapterStatus::Disconnected,
         }
@@ -271,7 +258,7 @@ mod imp {
     fn include(row: &MIB_IF_ROW2, alias: &str, desc: &str) -> bool {
         let flags = row.InterfaceAndOperStatusFlags._bitfield;
         row.Type != IF_TYPE_SOFTWARE_LOOPBACK
-            && row.TunnelType as i32 == 0
+            && row.TunnelType == 0
             && flags & FLAG_FILTER == 0
             && !is_noise(alias, desc)
     }
@@ -449,7 +436,6 @@ mod imp {
                 if idx6 != 0 && idx6 != idx4 {
                     map.entry(idx6).or_insert(entry);
                 }
-                let _ = pwstr(a.FriendlyName);
                 cur = a.Next;
             }
         }

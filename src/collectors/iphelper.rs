@@ -6,8 +6,6 @@
 //! yazılır. Sınırlamalar: UDP trafiği ve bir saniyeden kısa ömürlü bağlantılar
 //! görünmez — planda belirtildiği gibi ETW birincil kaynaktır.
 
-use crate::collectors::etw::EtwHandle;
-
 #[cfg(windows)]
 mod imp {
     use std::collections::{HashMap, HashSet};
@@ -263,6 +261,6 @@ mod imp {
 pub use imp::start;
 
 #[cfg(not(windows))]
-pub fn start(_handle: EtwHandle) {
+pub fn start(_handle: crate::collectors::etw::EtwHandle) {
     tracing::info!("IP Helper yedeği yalnızca Windows'ta");
 }
