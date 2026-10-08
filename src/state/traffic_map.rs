@@ -42,17 +42,27 @@ impl TrafficMap {
         alive: &HashMap<u32, u64>,
     ) -> (Vec<u32>, Vec<(u32, u64, u64)>) {
         let mut deltas = Vec::new();
-        let elapsed = self.last.map(|l| now.duration_since(l).as_secs_f64()).unwrap_or(0.0);
+        let elapsed = self
+            .last
+            .map(|l| now.duration_since(l).as_secs_f64())
+            .unwrap_or(0.0);
         self.last = Some(now);
 
         for (&pid, &cur) in etw {
             let start = alive.get(&pid).copied().unwrap_or(0);
-            let entry = self.stats.entry(pid).or_insert(TrafficStats { start_time: start, ..Default::default() });
+            let entry = self.stats.entry(pid).or_insert(TrafficStats {
+                start_time: start,
+                ..Default::default()
+            });
 
             // Aynı PID, farklı başlangıç zamanı → yeni process.
             if start != 0 && entry.start_time != 0 && entry.start_time != start {
-                *entry = TrafficStats { start_time: start, ..Default::default() };
-                self.base.insert(pid, self.prev.get(&pid).copied().unwrap_or_default());
+                *entry = TrafficStats {
+                    start_time: start,
+                    ..Default::default()
+                };
+                self.base
+                    .insert(pid, self.prev.get(&pid).copied().unwrap_or_default());
             } else if entry.start_time == 0 {
                 entry.start_time = start;
             }
@@ -182,6 +192,10 @@ mod tests {
         // Aynı PID, farklı başlangıç zamanı (ETW haritası henüz silinmemiş)
         let etw: HashMap<u32, PidBytes> = [(7, pb(800, 0))].into();
         m.update(t0 + Duration::from_secs(1), &etw, &[(7, 99)].into());
-        assert_eq!(m.get(7).rx_bytes, 300, "yeni process yalnızca kendi baytlarını görmeli");
+        assert_eq!(
+            m.get(7).rx_bytes,
+            300,
+            "yeni process yalnızca kendi baytlarını görmeli"
+        );
     }
 }

@@ -2,15 +2,17 @@
 
 use std::time::Duration;
 
-use iced::widget::{button, canvas, column, container, progress_bar, row, text, Space};
+use iced::widget::{Space, button, canvas, column, container, progress_bar, row, text};
 use iced::{Alignment, Background, Border, Color, Element, Length, Padding};
 
-use crate::app::{App, Message, Page, ALL_LABEL};
+use crate::app::{ALL_LABEL, App, Message, Page};
 use crate::collectors::etw::EtwStatus;
 use crate::collectors::nic::{AdapterInfo, AdapterStatus};
 use crate::theme::p;
 use crate::ui::chart::LineChart;
-use crate::ui::{bar, card, card_with, chip, info_row, metric, panel_style, small_button, th, tree};
+use crate::ui::{
+    bar, card, card_with, chip, info_row, metric, panel_style, small_button, th, tree,
+};
 use crate::units::{self, DisplayUnit};
 
 pub fn view(app: &App) -> Element<'_, Message> {
@@ -30,8 +32,16 @@ pub fn view(app: &App) -> Element<'_, Message> {
 // ---------------------------------------------------------------------------
 
 pub fn sidebar(app: &App) -> Element<'_, Message> {
-    let physical: Vec<&AdapterInfo> = app.adapters.iter().filter(|a| !a.kind.is_virtual()).collect();
-    let virtuals: Vec<&AdapterInfo> = app.adapters.iter().filter(|a| a.kind.is_virtual()).collect();
+    let physical: Vec<&AdapterInfo> = app
+        .adapters
+        .iter()
+        .filter(|a| !a.kind.is_virtual())
+        .collect();
+    let virtuals: Vec<&AdapterInfo> = app
+        .adapters
+        .iter()
+        .filter(|a| a.kind.is_virtual())
+        .collect();
 
     let mut list = column![all_item(app)].spacing(5);
     for a in &physical {
@@ -39,14 +49,23 @@ pub fn sidebar(app: &App) -> Element<'_, Message> {
     }
 
     // Sanal adaptör grubu
-    let up = virtuals.iter().filter(|a| a.status == AdapterStatus::Up).count();
+    let up = virtuals
+        .iter()
+        .filter(|a| a.status == AdapterStatus::Up)
+        .count();
     let open = app.cfg.virtual_group_open;
     let group_head = button(
         row![
-            text(if open { "▾" } else { "▸" }).size(12).color(p().accent),
-            text(format!("Sanal Adaptörler ({})", virtuals.len())).size(12).color(p().text),
+            text(if open { "▾" } else { "▸" })
+                .size(12)
+                .color(p().accent),
+            text(format!("Sanal Adaptörler ({})", virtuals.len()))
+                .size(12)
+                .color(p().text),
             Space::new().width(Length::Fill),
-            text(format!("{up} aktif")).size(10).color(if up > 0 { p().good } else { p().muted }),
+            text(format!("{up} aktif"))
+                .size(10)
+                .color(if up > 0 { p().good } else { p().muted }),
         ]
         .spacing(7)
         .align_y(Alignment::Center),
@@ -55,9 +74,19 @@ pub fn sidebar(app: &App) -> Element<'_, Message> {
     .width(Length::Fill)
     .on_press(Message::ToggleVirtualGroup)
     .style(|_, status| button::Style {
-        background: Some(Background::Color(if matches!(status, button::Status::Hovered) { p().selected } else { p().panel_alt })),
+        background: Some(Background::Color(
+            if matches!(status, button::Status::Hovered) {
+                p().selected
+            } else {
+                p().panel_alt
+            },
+        )),
         text_color: p().text,
-        border: Border { color: p().border, width: 1.0, radius: 6.0.into() },
+        border: Border {
+            color: p().border,
+            width: 1.0,
+            radius: 6.0.into(),
+        },
         ..Default::default()
     });
     if !virtuals.is_empty() {
@@ -67,7 +96,10 @@ pub fn sidebar(app: &App) -> Element<'_, Message> {
             for a in &virtuals {
                 inner = inner.push(adapter_item(app, a, true));
             }
-            list = list.push(container(inner).padding(Padding { left: 10.0, ..Padding::ZERO }));
+            list = list.push(container(inner).padding(Padding {
+                left: 10.0,
+                ..Padding::ZERO
+            }));
         }
     }
 
@@ -92,7 +124,10 @@ pub fn sidebar(app: &App) -> Element<'_, Message> {
             ]
             .align_y(Alignment::Center),
             list,
-            container(info).padding(12).width(Length::Fill).style(|_| panel_style(p().panel_alt, p().border, 8.0)),
+            container(info)
+                .padding(12)
+                .width(Length::Fill)
+                .style(|_| panel_style(p().panel_alt, p().border, 8.0)),
         ]
         .spacing(8),
     )
@@ -154,9 +189,14 @@ fn item_button<'a>(
 ) -> Element<'a, Message> {
     button(
         row![
-            text(icon).size(15).color(p().accent).width(Length::Fixed(20.0)),
+            text(icon)
+                .size(15)
+                .color(p().accent)
+                .width(Length::Fixed(20.0)),
             column![
-                text(title).size(12).color(if selected { p().title } else { p().text }),
+                text(title)
+                    .size(12)
+                    .color(if selected { p().title } else { p().text }),
                 text(sub).size(9).color(p().muted),
             ]
             .spacing(1)
@@ -198,7 +238,11 @@ pub fn adapter_info<'a>(app: &'a App, a: &'a AdapterInfo) -> Element<'a, Message
         None => "—",
     };
     let link = if a.rx_link_bps != a.tx_link_bps && a.rx_link_bps != 0 && a.tx_link_bps != 0 {
-        format!("↓{} / ↑{}", units::link(a.rx_link_bps), units::link(a.tx_link_bps))
+        format!(
+            "↓{} / ↑{}",
+            units::link(a.rx_link_bps),
+            units::link(a.tx_link_bps)
+        )
     } else {
         units::link(a.link_bps())
     };
@@ -239,8 +283,10 @@ pub fn short(s: &str, n: usize) -> String {
 
 fn realtime(app: &App) -> Element<'_, Message> {
     let unit = app.cfg.unit;
-    let chips = row(DisplayUnit::ALL.iter().map(|u| chip(u.label().to_string(), *u == unit, Message::SetUnit(*u))))
-        .spacing(4);
+    let chips = row(DisplayUnit::ALL
+        .iter()
+        .map(|u| chip(u.label().to_string(), *u == unit, Message::SetUnit(*u))))
+    .spacing(4);
 
     let link = app.selected_adapter().map(|a| a.link_bps()).unwrap_or(0);
     let util = |bps: f64| {
@@ -252,13 +298,32 @@ fn realtime(app: &App) -> Element<'_, Message> {
     };
 
     let metrics = row![
-        metric("↓", "İndirme (RX)", units::speed(app.rx_speed, unit), p().rx, util(app.rx_speed)),
-        metric("↑", "Yükleme (TX)", units::speed(app.tx_speed, unit), p().tx, util(app.tx_speed)),
+        metric(
+            "↓",
+            "İndirme (RX)",
+            units::speed(app.rx_speed, unit),
+            p().rx,
+            util(app.rx_speed)
+        ),
+        metric(
+            "↑",
+            "Yükleme (TX)",
+            units::speed(app.tx_speed, unit),
+            p().tx,
+            util(app.tx_speed)
+        ),
     ]
     .spacing(10);
 
     let points = app.chart_points();
-    let data: Vec<(f64, f64)> = app.history.iter().rev().take(points).rev().copied().collect();
+    let data: Vec<(f64, f64)> = app
+        .history
+        .iter()
+        .rev()
+        .take(points)
+        .rev()
+        .copied()
+        .collect();
     let chart = canvas(LineChart {
         series: vec![
             (data.iter().map(|d| d.0).collect(), p().rx),
@@ -275,15 +340,32 @@ fn realtime(app: &App) -> Element<'_, Message> {
         text("■ İndirme (RX)").size(11).color(p().rx),
         text("■ Yükleme (TX)").size(11).color(p().tx),
         Space::new().width(Length::Fill),
-        chip("Son 60 sn".into(), app.chart_secs == 60, Message::SetChartRange(60)),
-        chip("5 dk".into(), app.chart_secs == 300, Message::SetChartRange(300)),
-        chip("10 dk".into(), app.chart_secs == 600, Message::SetChartRange(600)),
+        chip(
+            "Son 60 sn".into(),
+            app.chart_secs == 60,
+            Message::SetChartRange(60)
+        ),
+        chip(
+            "5 dk".into(),
+            app.chart_secs == 300,
+            Message::SetChartRange(300)
+        ),
+        chip(
+            "10 dk".into(),
+            app.chart_secs == 600,
+            Message::SetChartRange(600)
+        ),
     ]
     .spacing(10)
     .align_y(Alignment::Center);
 
     let title = format!("Gerçek Zamanlı Ağ Trafiği — {}", app.selected_label());
-    card_with(&title, "", chips, column![metrics, ranges, chart].spacing(10))
+    card_with(
+        &title,
+        "",
+        chips,
+        column![metrics, ranges, chart].spacing(10),
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +377,16 @@ fn usage(app: &App) -> Element<'_, Message> {
     let win = |label: &'static str, secs: u64| {
         let (rx, tx) = app.rolling.total_since(Duration::from_secs(secs));
         let partial = covered < Duration::from_secs(secs.saturating_sub(2));
-        usage_box(label, rx, tx, if partial { Some(covered.as_secs()) } else { None })
+        usage_box(
+            label,
+            rx,
+            tx,
+            if partial {
+                Some(covered.as_secs())
+            } else {
+                None
+            },
+        )
     };
     let today = app.usage.today();
     let week = app.usage.this_week();
@@ -313,7 +404,12 @@ fn usage(app: &App) -> Element<'_, Message> {
         "Toplam Kullanım",
         note,
         column![
-            row![win("Son 1 Dakika", 60), win("Son 5 Dakika", 300), win("Son 10 Dakika", 600)].spacing(8),
+            row![
+                win("Son 1 Dakika", 60),
+                win("Son 5 Dakika", 300),
+                win("Son 10 Dakika", 600)
+            ]
+            .spacing(8),
             row![
                 usage_box("Bugün", today.rx, today.tx, None),
                 usage_box("Bu Hafta", week.rx, week.tx, None),
@@ -325,7 +421,12 @@ fn usage(app: &App) -> Element<'_, Message> {
     )
 }
 
-fn usage_box<'a>(label: &'static str, rx: u64, tx: u64, partial_secs: Option<u64>) -> Element<'a, Message> {
+fn usage_box<'a>(
+    label: &'static str,
+    rx: u64,
+    tx: u64,
+    partial_secs: Option<u64>,
+) -> Element<'a, Message> {
     let mut head = row![text(label).size(11).color(p().muted)].spacing(6);
     if let Some(s) = partial_secs {
         head = head.push(text(format!("({} sn veri)", s)).size(9).color(p().muted));
@@ -333,9 +434,19 @@ fn usage_box<'a>(label: &'static str, rx: u64, tx: u64, partial_secs: Option<u64
     container(
         column![
             head,
-            row![text("↓").size(13).color(p().rx), text(units::bytes(rx)).size(16).color(p().rx)].spacing(5),
-            row![text("↑").size(13).color(p().tx), text(units::bytes(tx)).size(16).color(p().tx)].spacing(5),
-            text(format!("Toplam {}", units::bytes(rx.saturating_add(tx)))).size(11).color(p().text),
+            row![
+                text("↓").size(13).color(p().rx),
+                text(units::bytes(rx)).size(16).color(p().rx)
+            ]
+            .spacing(5),
+            row![
+                text("↑").size(13).color(p().tx),
+                text(units::bytes(tx)).size(16).color(p().tx)
+            ]
+            .spacing(5),
+            text(format!("Toplam {}", units::bytes(rx.saturating_add(tx))))
+                .size(11)
+                .color(p().text),
         ]
         .spacing(3),
     )
@@ -366,25 +477,41 @@ pub fn speed_mini(app: &App) -> container::Container<'_, Message> {
         let ago = (chrono::Local::now().timestamp() - r.timestamp).max(0) as u64;
         column![
             row![
-                text(format!("↓ {}", units::mbps(r.download_mbps))).size(18).color(p().rx),
-                text(format!("↑ {}", units::mbps(r.upload_mbps))).size(18).color(p().tx),
+                text(format!("↓ {}", units::mbps(r.download_mbps)))
+                    .size(18)
+                    .color(p().rx),
+                text(format!("↑ {}", units::mbps(r.upload_mbps)))
+                    .size(18)
+                    .color(p().tx),
             ]
             .spacing(14),
             row![
-                text(format!("Ping {:.0} ms", r.ping_ms)).size(12).color(p().text),
-                text(format!("Jitter {:.1} ms", r.jitter_ms)).size(12).color(p().text),
+                text(format!("Ping {:.0} ms", r.ping_ms))
+                    .size(12)
+                    .color(p().text),
+                text(format!("Jitter {:.1} ms", r.jitter_ms))
+                    .size(12)
+                    .color(p().text),
             ]
             .spacing(14),
-            text(format!("{} · {}", r.server, units::ago(ago))).size(10).color(p().muted),
+            text(format!("{} · {}", r.server, units::ago(ago)))
+                .size(10)
+                .color(p().muted),
         ]
         .spacing(6)
         .into()
     } else {
-        text("Henüz test yapılmadı.").size(11).color(p().muted).into()
+        text("Henüz test yapılmadı.")
+            .size(11)
+            .color(p().muted)
+            .into()
     };
 
     let err: Element<'_, Message> = match &st.last_error {
-        Some(e) => text(format!("Son hata: {e}")).size(10).color(p().bad).into(),
+        Some(e) => text(format!("Son hata: {e}"))
+            .size(10)
+            .color(p().bad)
+            .into(),
         None => Space::new().into(),
     };
     let auto = if app.cfg.speedtest_auto {
@@ -399,7 +526,12 @@ pub fn speed_mini(app: &App) -> container::Container<'_, Message> {
         small_button("⚡ Test Başlat", Message::SpeedTest, true)
     };
 
-    container(card_with("Hız Testi", &auto, trailing, column![body, err].spacing(6)))
+    container(card_with(
+        "Hız Testi",
+        &auto,
+        trailing,
+        column![body, err].spacing(6),
+    ))
 }
 
 // ---------------------------------------------------------------------------
@@ -409,7 +541,7 @@ pub fn speed_mini(app: &App) -> container::Container<'_, Message> {
 fn top_processes(app: &App) -> Element<'_, Message> {
     let unit = app.cfg.unit;
     let mut list: Vec<_> = app.traffic.iter().filter(|(_, s)| s.total() > 0).collect();
-    list.sort_by(|a, b| b.1.total().cmp(&a.1.total()));
+    list.sort_by_key(|b| std::cmp::Reverse(b.1.total()));
     let max = list.first().map(|(_, s)| s.total()).unwrap_or(1).max(1);
 
     let mut rows = column![
@@ -425,7 +557,10 @@ fn top_processes(app: &App) -> Element<'_, Message> {
     .spacing(4);
 
     for (pid, s) in list.iter().take(7) {
-        let name = app.process(**pid).map(|p| p.name.clone()).unwrap_or_else(|| "(sonlandı)".into());
+        let name = app
+            .process(**pid)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "(sonlandı)".into());
         let frac = s.total() as f32 / max as f32;
         let pid = **pid;
         rows = rows.push(
@@ -433,10 +568,22 @@ fn top_processes(app: &App) -> Element<'_, Message> {
                 column![
                     row![
                         text(name).size(12).color(p().text).width(Length::Fill),
-                        text(pid.to_string()).size(11).color(p().muted).width(Length::Fixed(56.0)),
-                        text(units::speed(s.rx_per_sec, unit)).size(11).color(p().rx).width(Length::Fixed(80.0)),
-                        text(units::bytes(s.rx_bytes)).size(11).color(p().text).width(Length::Fixed(74.0)),
-                        text(units::bytes(s.tx_bytes)).size(11).color(p().text).width(Length::Fixed(74.0)),
+                        text(pid.to_string())
+                            .size(11)
+                            .color(p().muted)
+                            .width(Length::Fixed(56.0)),
+                        text(units::speed(s.rx_per_sec, unit))
+                            .size(11)
+                            .color(p().rx)
+                            .width(Length::Fixed(80.0)),
+                        text(units::bytes(s.rx_bytes))
+                            .size(11)
+                            .color(p().text)
+                            .width(Length::Fixed(74.0)),
+                        text(units::bytes(s.tx_bytes))
+                            .size(11)
+                            .color(p().text)
+                            .width(Length::Fixed(74.0)),
                     ]
                     .spacing(6),
                     bar(frac, p().accent_strong),
@@ -447,16 +594,28 @@ fn top_processes(app: &App) -> Element<'_, Message> {
             .width(Length::Fill)
             .on_press(Message::SelectRoot(pid))
             .style(|_, st| button::Style {
-                background: Some(Background::Color(if matches!(st, button::Status::Hovered) { p().panel_alt } else { Color::TRANSPARENT })),
+                background: Some(Background::Color(
+                    if matches!(st, button::Status::Hovered) {
+                        p().panel_alt
+                    } else {
+                        Color::TRANSPARENT
+                    },
+                )),
                 text_color: p().text,
-                border: Border { radius: 4.0.into(), ..Default::default() },
+                border: Border {
+                    radius: 4.0.into(),
+                    ..Default::default()
+                },
                 ..Default::default()
             }),
         );
     }
 
     let empty: Element<'_, Message> = match app.etw.status() {
-        EtwStatus::Failed(e) => text(format!("ETW kullanılamıyor: {e}")).size(11).color(p().bad).into(),
+        EtwStatus::Failed(e) => text(format!("ETW kullanılamıyor: {e}"))
+            .size(11)
+            .color(p().bad)
+            .into(),
         _ if list.is_empty() => text("Trafik bekleniyor…").size(11).color(p().muted).into(),
         _ => Space::new().into(),
     };
@@ -470,5 +629,9 @@ fn top_processes(app: &App) -> Element<'_, Message> {
 }
 
 fn tree_card(app: &App) -> Element<'_, Message> {
-    card("Process Ağacı", "Seçili uygulama ve tüm child process'leri", tree::panel(app, 210.0))
+    card(
+        "Process Ağacı",
+        "Seçili uygulama ve tüm child process'leri",
+        tree::panel(app, 210.0),
+    )
 }

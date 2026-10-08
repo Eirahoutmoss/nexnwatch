@@ -1,7 +1,7 @@
 //! Canvas tabanlı çizgi ve çubuk grafikleri.
 
 use iced::widget::canvas::{self, Path, Program, Stroke, Text};
-use iced::{mouse, Color, Point, Rectangle, Renderer, Size, Theme};
+use iced::{Color, Point, Rectangle, Renderer, Size, Theme, mouse};
 
 use crate::theme::p;
 
@@ -64,14 +64,17 @@ impl<Message> Program<Message> for LineChart {
             for i in 0..=5 {
                 let x = LEFT + plot_w * i as f32 / 5.0;
                 let secs = span - span * i as u64 / 5;
-                let label = if secs >= 60 && secs % 60 == 0 {
+                let label = if secs >= 60 && secs.is_multiple_of(60) {
                     format!("{} dk", secs / 60)
                 } else {
                     format!("{secs} sn")
                 };
                 frame.fill_text(Text {
                     content: label,
-                    position: Point::new((x - 12.0).clamp(LEFT, LEFT + plot_w - 34.0), TOP + plot_h + 5.0),
+                    position: Point::new(
+                        (x - 12.0).clamp(LEFT, LEFT + plot_w - 34.0),
+                        TOP + plot_h + 5.0,
+                    ),
                     color: p().muted,
                     size: 10.0.into(),
                     ..Text::default()
@@ -100,7 +103,11 @@ fn draw_series(
     if values.len() < 2 {
         return;
     }
-    let values = if values.len() > cap { &values[values.len() - cap..] } else { values };
+    let values = if values.len() > cap {
+        &values[values.len() - cap..]
+    } else {
+        values
+    };
     let step = plot_w / (cap - 1) as f32;
     let offset = (cap - values.len()) as f32 * step;
     let point = |i: usize, v: f64| {
@@ -111,7 +118,11 @@ fn draw_series(
 
     let line = Path::new(|b| {
         for (i, v) in values.iter().enumerate() {
-            if i == 0 { b.move_to(point(i, *v)) } else { b.line_to(point(i, *v)) }
+            if i == 0 {
+                b.move_to(point(i, *v))
+            } else {
+                b.line_to(point(i, *v))
+            }
         }
     });
     let area = Path::new(|b| {
@@ -119,7 +130,10 @@ fn draw_series(
         for (i, v) in values.iter().enumerate() {
             b.line_to(point(i, *v));
         }
-        b.line_to(Point::new(LEFT + offset + (values.len() - 1) as f32 * step, TOP + plot_h));
+        b.line_to(Point::new(
+            LEFT + offset + (values.len() - 1) as f32 * step,
+            TOP + plot_h,
+        ));
         b.close();
     });
     frame.fill(&area, Color { a: 0.12, ..color });
@@ -194,7 +208,11 @@ impl<Message> Program<Message> for BarChart {
             let h_tx = (*tx / max) as f32 * plot_h;
             let base = TOP + plot_h;
             frame.fill_rectangle(Point::new(x, base - h_rx), Size::new(w, h_rx), p().rx);
-            frame.fill_rectangle(Point::new(x, base - h_rx - h_tx), Size::new(w, h_tx), p().tx);
+            frame.fill_rectangle(
+                Point::new(x, base - h_rx - h_tx),
+                Size::new(w, h_tx),
+                p().tx,
+            );
             if i % label_every == 0 || i == n - 1 {
                 frame.fill_text(Text {
                     content: label.clone(),

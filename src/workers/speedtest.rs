@@ -110,7 +110,10 @@ impl SpeedTester {
     }
 
     pub fn last(&self) -> Option<SpeedResult> {
-        self.state.lock().ok().and_then(|s| s.history.last().cloned())
+        self.state
+            .lock()
+            .ok()
+            .and_then(|s| s.history.last().cloned())
     }
 
     pub fn start(&self, auto: bool) {
@@ -131,7 +134,9 @@ impl SpeedTester {
                         Ok(r) => {
                             tracing::info!(
                                 "Hız testi: ↓{:.1} ↑{:.1} Mbps, ping {:.1} ms",
-                                r.download_mbps, r.upload_mbps, r.ping_ms
+                                r.download_mbps,
+                                r.upload_mbps,
+                                r.ping_ms
                             );
                             st.history.push(r);
                             let len = st.history.len();
@@ -232,7 +237,9 @@ impl SpeedTester {
                 std::thread::spawn(move || {
                     let mut buf = vec![0u8; 64 * 1024];
                     while Instant::now() < deadline {
-                        let resp = agent.get(format!("https://{HOST}/__down?bytes=100000000")).call();
+                        let resp = agent
+                            .get(format!("https://{HOST}/__down?bytes=100000000"))
+                            .call();
                         let Ok(mut resp) = resp else {
                             errors.fetch_add(1, Ordering::Relaxed);
                             std::thread::sleep(Duration::from_millis(200));
@@ -276,7 +283,8 @@ impl SpeedTester {
         let counter = Arc::new(AtomicU64::new(0));
         let start = Instant::now();
         let deadline = start + Duration::from_secs(PHASE_SECS);
-        let chunk: Arc<Vec<u8>> = Arc::new((0..2 * 1024 * 1024).map(|i| (i * 31 % 251) as u8).collect());
+        let chunk: Arc<Vec<u8>> =
+            Arc::new((0..2 * 1024 * 1024).map(|i| (i * 31 % 251) as u8).collect());
 
         let workers: Vec<_> = (0..STREAMS)
             .map(|_| {
@@ -310,7 +318,15 @@ impl SpeedTester {
     }
 
     /// Aşama sürerken canlı Mbps ve ilerlemeyi günceller.
-    fn monitor(&self, phase: Phase, counter: &AtomicU64, start: Instant, deadline: Instant, p0: f32, p1: f32) {
+    fn monitor(
+        &self,
+        phase: Phase,
+        counter: &AtomicU64,
+        start: Instant,
+        deadline: Instant,
+        p0: f32,
+        p1: f32,
+    ) {
         let total = deadline.duration_since(start).as_secs_f32();
         while Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(250));

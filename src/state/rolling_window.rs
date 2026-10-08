@@ -17,7 +17,10 @@ pub struct RollingWindow {
 
 impl RollingWindow {
     pub fn new(capacity: Duration) -> Self {
-        Self { samples: VecDeque::new(), capacity }
+        Self {
+            samples: VecDeque::new(),
+            capacity,
+        }
     }
 
     pub fn set_capacity(&mut self, capacity: Duration) {
@@ -44,7 +47,9 @@ impl RollingWindow {
 
     /// Son `duration` içindeki toplam (rx, tx) bayt.
     pub fn total_since(&self, duration: Duration) -> (u64, u64) {
-        let Some(last) = self.samples.back() else { return (0, 0) };
+        let Some(last) = self.samples.back() else {
+            return (0, 0);
+        };
         let cutoff = last.at.checked_sub(duration).unwrap_or(last.at);
         // Pencere başına en yakın (cutoff'tan önceki son) örnek: tam pencereyi kapsar.
         let first = self
@@ -87,7 +92,11 @@ mod tests {
         let t0 = Instant::now();
         let mut w = RollingWindow::new(Duration::from_secs(600));
         for i in 0..=120u64 {
-            w.push(Sample { at: t0 + Duration::from_secs(i), rx_bytes: i * 100, tx_bytes: i * 10 });
+            w.push(Sample {
+                at: t0 + Duration::from_secs(i),
+                rx_bytes: i * 100,
+                tx_bytes: i * 10,
+            });
         }
         assert_eq!(w.total_since(Duration::from_secs(60)), (6000, 600));
         assert_eq!(w.total_since(Duration::from_secs(600)), (12000, 1200));

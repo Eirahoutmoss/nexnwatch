@@ -15,9 +15,7 @@ pub fn snapshot(system: &mut System) -> Vec<ProcessInfo> {
     system.refresh_processes_specifics(
         ProcessesToUpdate::All,
         true,
-        ProcessRefreshKind::nothing()
-            .with_cpu()
-            .with_memory(),
+        ProcessRefreshKind::nothing().with_cpu().with_memory(),
     );
 
     system

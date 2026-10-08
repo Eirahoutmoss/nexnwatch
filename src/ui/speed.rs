@@ -1,6 +1,6 @@
 //! Hız Testi sayfası — anlık test, son sonuç, geçmiş ve grafik.
 
-use iced::widget::{canvas, column, container, progress_bar, row, scrollable, text, Space};
+use iced::widget::{Space, canvas, column, container, progress_bar, row, scrollable, text};
 use iced::{Alignment, Element, Length};
 
 use crate::app::{App, Message};
@@ -15,9 +15,12 @@ pub fn view(app: &App) -> Element<'_, Message> {
 
     let big = |label: &str, value: String, color: iced::Color| -> Element<'_, Message> {
         container(
-            column![text(label.to_string()).size(12).color(p().muted), text(value).size(30).color(color)]
-                .spacing(4)
-                .align_x(Alignment::Center),
+            column![
+                text(label.to_string()).size(12).color(p().muted),
+                text(value).size(30).color(color)
+            ]
+            .spacing(4)
+            .align_x(Alignment::Center),
         )
         .padding(16)
         .width(Length::Fill)
@@ -35,7 +38,9 @@ pub fn view(app: &App) -> Element<'_, Message> {
             ]
             .align_y(Alignment::Center),
             progress_bar(0.0..=1.0, st.progress).girth(8),
-            text("Test sırasında oluşan trafik pencere toplamlarına (1/5/10 dk) katılmaz.").size(10).color(p().muted),
+            text("Test sırasında oluşan trafik pencere toplamlarına (1/5/10 dk) katılmaz.")
+                .size(10)
+                .color(p().muted),
         ]
         .spacing(8)
         .into()
@@ -43,7 +48,11 @@ pub fn view(app: &App) -> Element<'_, Message> {
         match last {
             Some(r) => {
                 let when = chrono::DateTime::from_timestamp(r.timestamp, 0)
-                    .map(|d| d.with_timezone(&chrono::Local).format("%d.%m.%Y %H:%M").to_string())
+                    .map(|d| {
+                        d.with_timezone(&chrono::Local)
+                            .format("%d.%m.%Y %H:%M")
+                            .to_string()
+                    })
                     .unwrap_or_default();
                 column![
                     row![
@@ -66,12 +75,18 @@ pub fn view(app: &App) -> Element<'_, Message> {
                 .spacing(8)
                 .into()
             }
-            None => text("Henüz test yapılmadı. \"Test Başlat\" ile ilk ölçümü alın.").size(12).color(p().muted).into(),
+            None => text("Henüz test yapılmadı. \"Test Başlat\" ile ilk ölçümü alın.")
+                .size(12)
+                .color(p().muted)
+                .into(),
         }
     };
 
     let err: Element<'_, Message> = match &st.last_error {
-        Some(e) => text(format!("Son hata: {e}")).size(11).color(p().bad).into(),
+        Some(e) => text(format!("Son hata: {e}"))
+            .size(11)
+            .color(p().bad)
+            .into(),
         None => Space::new().into(),
     };
 
@@ -81,23 +96,40 @@ pub fn view(app: &App) -> Element<'_, Message> {
         small_button("⚡ Test Başlat", Message::SpeedTest, true)
     };
     let auto = if app.cfg.speedtest_auto {
-        format!("Cloudflare hız testi · otomatik her {} dk (Ayarlar'dan değiştirilebilir)", app.cfg.speedtest_interval_min)
+        format!(
+            "Cloudflare hız testi · otomatik her {} dk (Ayarlar'dan değiştirilebilir)",
+            app.cfg.speedtest_interval_min
+        )
     } else {
         "Cloudflare hız testi · otomatik test kapalı".to_string()
     };
-    let top = card_with("Hız Testi", &auto, trailing, column![current, err].spacing(8));
+    let top = card_with(
+        "Hız Testi",
+        &auto,
+        trailing,
+        column![current, err].spacing(8),
+    );
 
     // Geçmiş grafiği
     let hist: Vec<_> = st.history.iter().rev().take(60).rev().collect();
     let chart_body: Element<'_, Message> = if hist.len() < 2 {
-        text("Grafik için en az iki test sonucu gerekiyor.").size(11).color(p().muted).into()
+        text("Grafik için en az iki test sonucu gerekiyor.")
+            .size(11)
+            .color(p().muted)
+            .into()
     } else {
         canvas(LineChart {
             series: vec![
                 (hist.iter().map(|r| r.download_mbps).collect(), p().rx),
                 (hist.iter().map(|r| r.upload_mbps).collect(), p().tx),
             ],
-            fmt: Box::new(|v| if v < 10.0 { format!("{v:.1} Mbps") } else { format!("{v:.0} Mbps") }),
+            fmt: Box::new(|v| {
+                if v < 10.0 {
+                    format!("{v:.1} Mbps")
+                } else {
+                    format!("{v:.0} Mbps")
+                }
+            }),
             span_secs: None,
             capacity: hist.len().max(2),
         })
@@ -105,7 +137,11 @@ pub fn view(app: &App) -> Element<'_, Message> {
         .height(180)
         .into()
     };
-    let chart = card("Geçmiş (son 60 test)", "■ mavi: indirme · ■ turuncu: yükleme (Mbps)", chart_body);
+    let chart = card(
+        "Geçmiş (son 60 test)",
+        "■ mavi: indirme · ■ turuncu: yükleme (Mbps)",
+        chart_body,
+    );
 
     // Geçmiş tablosu
     let w = |v: f32| Length::Fixed(v);
@@ -125,18 +161,43 @@ pub fn view(app: &App) -> Element<'_, Message> {
     .spacing(3);
     for r in st.history.iter().rev().take(200) {
         let when = chrono::DateTime::from_timestamp(r.timestamp, 0)
-            .map(|d| d.with_timezone(&chrono::Local).format("%d.%m.%Y %H:%M").to_string())
+            .map(|d| {
+                d.with_timezone(&chrono::Local)
+                    .format("%d.%m.%Y %H:%M")
+                    .to_string()
+            })
             .unwrap_or_default();
         rows = rows.push(
             row![
                 text(when).size(11).color(p().text).width(w(130.0)),
-                text(units::mbps(r.download_mbps)).size(11).color(p().rx).width(w(100.0)),
-                text(units::mbps(r.upload_mbps)).size(11).color(p().tx).width(w(100.0)),
-                text(format!("{:.0} ms", r.ping_ms)).size(11).color(p().text).width(w(64.0)),
-                text(format!("{:.1} ms", r.jitter_ms)).size(11).color(p().text).width(w(64.0)),
-                text(units::bytes(r.bytes_used)).size(11).color(p().muted).width(w(76.0)),
-                text(if r.auto { "Otomatik" } else { "Manuel" }).size(11).color(p().muted).width(w(64.0)),
-                text(format!("{} · {}", r.server, r.isp)).size(11).color(p().muted).width(Length::Fill),
+                text(units::mbps(r.download_mbps))
+                    .size(11)
+                    .color(p().rx)
+                    .width(w(100.0)),
+                text(units::mbps(r.upload_mbps))
+                    .size(11)
+                    .color(p().tx)
+                    .width(w(100.0)),
+                text(format!("{:.0} ms", r.ping_ms))
+                    .size(11)
+                    .color(p().text)
+                    .width(w(64.0)),
+                text(format!("{:.1} ms", r.jitter_ms))
+                    .size(11)
+                    .color(p().text)
+                    .width(w(64.0)),
+                text(units::bytes(r.bytes_used))
+                    .size(11)
+                    .color(p().muted)
+                    .width(w(76.0)),
+                text(if r.auto { "Otomatik" } else { "Manuel" })
+                    .size(11)
+                    .color(p().muted)
+                    .width(w(64.0)),
+                text(format!("{} · {}", r.server, r.isp))
+                    .size(11)
+                    .color(p().muted)
+                    .width(Length::Fill),
             ]
             .spacing(6),
         );

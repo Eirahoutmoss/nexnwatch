@@ -11,13 +11,24 @@ pub fn set_autostart(enable: bool) -> Result<(), String> {
     let mut cmd = std::process::Command::new("schtasks.exe");
     if enable {
         cmd.args([
-            "/Create", "/F", "/TN", "NexNWatch", "/SC", "ONLOGON", "/RL", "HIGHEST", "/TR",
+            "/Create",
+            "/F",
+            "/TN",
+            "NexNWatch",
+            "/SC",
+            "ONLOGON",
+            "/RL",
+            "HIGHEST",
+            "/TR",
             &format!("\"{}\" --minimized", exe.display()),
         ]);
     } else {
         cmd.args(["/Delete", "/F", "/TN", "NexNWatch"]);
     }
-    let out = cmd.creation_flags(CREATE_NO_WINDOW).output().map_err(|e| e.to_string())?;
+    let out = cmd
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .map_err(|e| e.to_string())?;
     if out.status.success() || !enable {
         Ok(())
     } else {
@@ -39,10 +50,19 @@ pub fn crash_dialog(message: &str) {
     let text = format!(
         "NexNWatch beklenmeyen bir hatayla karşılaştı:\n\n{message}\n\nAyrıntılar: %APPDATA%\\NexNWatch\\logs\n\nUygulama yeniden başlatılsın mı?"
     );
-    let wide = |s: &str| s.encode_utf16().chain(std::iter::once(0)).collect::<Vec<u16>>();
+    let wide = |s: &str| {
+        s.encode_utf16()
+            .chain(std::iter::once(0))
+            .collect::<Vec<u16>>()
+    };
     let (t, c) = (wide(&text), wide("NexNWatch — Hata"));
     let answer = unsafe {
-        MessageBoxW(std::ptr::null_mut(), t.as_ptr(), c.as_ptr(), MB_YESNO | MB_ICONERROR | MB_TOPMOST)
+        MessageBoxW(
+            std::ptr::null_mut(),
+            t.as_ptr(),
+            c.as_ptr(),
+            MB_YESNO | MB_ICONERROR | MB_TOPMOST,
+        )
     };
     if answer == IDYES {
         if let Ok(exe) = std::env::current_exe() {

@@ -1,6 +1,6 @@
 //! Ağ Adaptörleri sayfası — fiziksel ve sanal gruplar, tüm ayrıntılar.
 
-use iced::widget::{column, container, row, text, Space};
+use iced::widget::{Space, column, container, row, text};
 use iced::{Alignment, Element, Length};
 
 use crate::app::{App, Message};
@@ -10,9 +10,23 @@ use crate::ui::{card_with, info_row, panel_style, small_button};
 use crate::units;
 
 pub fn view(app: &App) -> Element<'_, Message> {
-    let physical: Vec<&AdapterInfo> = app.adapters.iter().filter(|a| !a.kind.is_virtual()).collect();
-    let mut virtuals: Vec<&AdapterInfo> = app.adapters.iter().filter(|a| a.kind.is_virtual()).collect();
-    virtuals.sort_by_key(|a| (a.kind.label(), a.status != AdapterStatus::Up, a.name.clone()));
+    let physical: Vec<&AdapterInfo> = app
+        .adapters
+        .iter()
+        .filter(|a| !a.kind.is_virtual())
+        .collect();
+    let mut virtuals: Vec<&AdapterInfo> = app
+        .adapters
+        .iter()
+        .filter(|a| a.kind.is_virtual())
+        .collect();
+    virtuals.sort_by_key(|a| {
+        (
+            a.kind.label(),
+            a.status != AdapterStatus::Up,
+            a.name.clone(),
+        )
+    });
 
     let phys = card_with(
         "Fiziksel Adaptörler",
@@ -22,7 +36,10 @@ pub fn view(app: &App) -> Element<'_, Message> {
     );
 
     let open = app.cfg.virtual_group_open;
-    let up = virtuals.iter().filter(|a| a.status == AdapterStatus::Up).count();
+    let up = virtuals
+        .iter()
+        .filter(|a| a.status == AdapterStatus::Up)
+        .count();
     let virt_body: Element<'_, Message> = if open {
         grid(app, &virtuals)
     } else {
@@ -39,7 +56,11 @@ pub fn view(app: &App) -> Element<'_, Message> {
     let virt = card_with(
         &format!("Sanal Adaptörler ({})", virtuals.len()),
         "VPN, Hyper-V / WSL, VMware, VirtualBox, Wi-Fi Direct… — trafikleri fiziksel adaptör üzerinden de geçtiği için toplama katılmaz",
-        small_button(if open { "Gizle" } else { "Göster" }, Message::ToggleVirtualGroup, false),
+        small_button(
+            if open { "Gizle" } else { "Göster" },
+            Message::ToggleVirtualGroup,
+            false,
+        ),
         virt_body,
     );
 
@@ -50,7 +71,11 @@ fn kinds_summary(list: &[&AdapterInfo]) -> String {
     let mut kinds: Vec<&str> = list.iter().map(|a| a.kind.label()).collect();
     kinds.sort();
     kinds.dedup();
-    if kinds.is_empty() { "—".into() } else { kinds.join(", ") }
+    if kinds.is_empty() {
+        "—".into()
+    } else {
+        kinds.join(", ")
+    }
 }
 
 fn grid<'a>(app: &'a App, list: &[&'a AdapterInfo]) -> Element<'a, Message> {
@@ -80,7 +105,13 @@ fn adapter_card<'a>(app: &'a App, a: &'a AdapterInfo) -> Element<'a, Message> {
         Some(false) => "Half",
         None => "—",
     };
-    let list = |v: &Vec<String>| if v.is_empty() { "—".to_string() } else { v.join("\n") };
+    let list = |v: &Vec<String>| {
+        if v.is_empty() {
+            "—".to_string()
+        } else {
+            v.join("\n")
+        }
+    };
     let selected = app.selected == Some(a.index);
 
     container(
@@ -93,13 +124,19 @@ fn adapter_card<'a>(app: &'a App, a: &'a AdapterInfo) -> Element<'a, Message> {
                 ]
                 .spacing(1),
                 Space::new().width(Length::Fill),
-                text(format!("● {}", a.status.label())).size(11).color(if up { p().good } else { p().bad }),
+                text(format!("● {}", a.status.label()))
+                    .size(11)
+                    .color(if up { p().good } else { p().bad }),
             ]
             .spacing(10)
             .align_y(Alignment::Center),
             row![
-                text(format!("↓ {}", units::speed(rate.rx, unit))).size(14).color(p().rx),
-                text(format!("↑ {}", units::speed(rate.tx, unit))).size(14).color(p().tx),
+                text(format!("↓ {}", units::speed(rate.rx, unit)))
+                    .size(14)
+                    .color(p().rx),
+                text(format!("↑ {}", units::speed(rate.tx, unit)))
+                    .size(14)
+                    .color(p().tx),
                 Space::new().width(Length::Fill),
                 if selected {
                     Element::from(text("İzleniyor").size(11).color(p().accent))
@@ -113,7 +150,14 @@ fn adapter_card<'a>(app: &'a App, a: &'a AdapterInfo) -> Element<'a, Message> {
                 column![
                     info_row("Tür", a.kind.label().to_string()),
                     info_row("MAC", a.mac.clone()),
-                    info_row("Link (↓/↑)", format!("{} / {}", units::link(a.rx_link_bps), units::link(a.tx_link_bps))),
+                    info_row(
+                        "Link (↓/↑)",
+                        format!(
+                            "{} / {}",
+                            units::link(a.rx_link_bps),
+                            units::link(a.tx_link_bps)
+                        )
+                    ),
                     info_row("Duplex", duplex.to_string()),
                     info_row("MTU", a.mtu.to_string()),
                     info_row("Arayüz No", a.index.to_string()),
@@ -125,7 +169,14 @@ fn adapter_card<'a>(app: &'a App, a: &'a AdapterInfo) -> Element<'a, Message> {
                     info_row("IPv6", list(&a.ipv6)),
                     info_row("Ağ Geçidi", list(&a.gateways)),
                     info_row("DNS", list(&a.dns)),
-                    info_row("Açılıştan beri", format!("↓ {}  ↑ {}", units::bytes(a.rx_bytes), units::bytes(a.tx_bytes))),
+                    info_row(
+                        "Açılıştan beri",
+                        format!(
+                            "↓ {}  ↑ {}",
+                            units::bytes(a.rx_bytes),
+                            units::bytes(a.tx_bytes)
+                        )
+                    ),
                 ]
                 .spacing(4)
                 .width(Length::FillPortion(1)),
@@ -136,6 +187,12 @@ fn adapter_card<'a>(app: &'a App, a: &'a AdapterInfo) -> Element<'a, Message> {
     )
     .padding(12)
     .width(Length::Fill)
-    .style(move |_| panel_style(p().panel_alt, if selected { p().accent } else { p().border }, 8.0))
+    .style(move |_| {
+        panel_style(
+            p().panel_alt,
+            if selected { p().accent } else { p().border },
+            8.0,
+        )
+    })
     .into()
 }

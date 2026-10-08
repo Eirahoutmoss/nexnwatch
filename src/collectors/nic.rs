@@ -22,7 +22,10 @@ pub enum AdapterKind {
 
 impl AdapterKind {
     pub fn is_virtual(self) -> bool {
-        !matches!(self, Self::Ethernet | Self::WiFi | Self::Bluetooth | Self::Cellular)
+        !matches!(
+            self,
+            Self::Ethernet | Self::WiFi | Self::Bluetooth | Self::Cellular
+        )
     }
 
     pub fn label(self) -> &'static str {
@@ -115,10 +118,28 @@ pub fn classify(alias: &str, description: &str, if_type: u32, hardware: bool) ->
     let any = |keys: &[&str]| keys.iter().any(|k| a.contains(k) || d.contains(k));
 
     if any(&[
-        "vpn", "tap-windows", "wireguard", "wintun", "openvpn", "fortinet", "forticlient",
-        "anyconnect", "globalprotect", "pangp", "juniper", "pulse secure", "zerotier",
-        "tailscale", "nordlynx", "protonvpn", "sonicwall", "check point", "cisco",
-        "softether", "hamachi", "radmin",
+        "vpn",
+        "tap-windows",
+        "wireguard",
+        "wintun",
+        "openvpn",
+        "fortinet",
+        "forticlient",
+        "anyconnect",
+        "globalprotect",
+        "pangp",
+        "juniper",
+        "pulse secure",
+        "zerotier",
+        "tailscale",
+        "nordlynx",
+        "protonvpn",
+        "sonicwall",
+        "check point",
+        "cisco",
+        "softether",
+        "hamachi",
+        "radmin",
     ]) {
         return AdapterKind::Vpn;
     }
@@ -134,16 +155,21 @@ pub fn classify(alias: &str, description: &str, if_type: u32, hardware: bool) ->
     if any(&["virtualbox", "vboxnet"]) {
         return AdapterKind::VirtualBox;
     }
-    if any(&["wi-fi direct", "wifi direct", "local area connection*", "yerel ağ bağlantısı*"]) {
+    if any(&[
+        "wi-fi direct",
+        "wifi direct",
+        "local area connection*",
+        "yerel ağ bağlantısı*",
+    ]) {
         return AdapterKind::WifiDirect;
     }
     if any(&["bluetooth"]) {
         return AdapterKind::Bluetooth;
     }
     match if_type {
-        71 => AdapterKind::WiFi,                  // IF_TYPE_IEEE80211
-        243 | 244 => AdapterKind::Cellular,       // WWAN PP / PP2
-        53 | 131 => AdapterKind::OtherVirtual,    // PROP_VIRTUAL / TUNNEL
+        71 => AdapterKind::WiFi,               // IF_TYPE_IEEE80211
+        243 | 244 => AdapterKind::Cellular,    // WWAN PP / PP2
+        53 | 131 => AdapterKind::OtherVirtual, // PROP_VIRTUAL / TUNNEL
         _ if !hardware => AdapterKind::OtherVirtual,
         _ if any(&["virtual", "loopback", "miniport", "pseudo"]) => AdapterKind::OtherVirtual,
         _ => AdapterKind::Ethernet,
@@ -157,9 +183,23 @@ pub fn is_noise(alias: &str, description: &str) -> bool {
     let a = alias.to_lowercase();
     let d = description.to_lowercase();
     const NOISE: &[&str] = &[
-        "wan miniport", "kernel debug", "teredo", "6to4", "isatap", "ip-https",
-        "lightweight filter", "packet scheduler", "wfp native", "wfp 802.3", "npcap packet",
-        "native wifi filter", "virtual wifi filter", "-0000", "-0001", "-0002", "-0003",
+        "wan miniport",
+        "kernel debug",
+        "teredo",
+        "6to4",
+        "isatap",
+        "ip-https",
+        "lightweight filter",
+        "packet scheduler",
+        "wfp native",
+        "wfp 802.3",
+        "npcap packet",
+        "native wifi filter",
+        "virtual wifi filter",
+        "-0000",
+        "-0001",
+        "-0002",
+        "-0003",
         "loopback pseudo-interface",
     ];
     NOISE.iter().any(|k| a.contains(k) || d.contains(k))
@@ -177,9 +217,8 @@ mod imp {
 
     use windows_sys::Win32::Foundation::ERROR_BUFFER_OVERFLOW;
     use windows_sys::Win32::NetworkManagement::IpHelper::{
-        FreeMibTable, GetAdaptersAddresses, GetIfTable2, GAA_FLAG_INCLUDE_GATEWAYS,
-        GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_MULTICAST, IP_ADAPTER_ADDRESSES_LH, MIB_IF_ROW2,
-        MIB_IF_TABLE2,
+        FreeMibTable, GAA_FLAG_INCLUDE_GATEWAYS, GAA_FLAG_SKIP_ANYCAST, GAA_FLAG_SKIP_MULTICAST,
+        GetAdaptersAddresses, GetIfTable2, IP_ADAPTER_ADDRESSES_LH, MIB_IF_ROW2, MIB_IF_TABLE2,
     };
     use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_INET6, AF_UNSPEC, SOCKET_ADDRESS};
 
@@ -189,7 +228,9 @@ mod imp {
 
     fn wide(value: &[u16]) -> String {
         let len = value.iter().position(|c| *c == 0).unwrap_or(value.len());
-        OsString::from_wide(&value[..len]).to_string_lossy().into_owned()
+        OsString::from_wide(&value[..len])
+            .to_string_lossy()
+            .into_owned()
     }
 
     unsafe fn pwstr(p: *const u16) -> String {
@@ -210,7 +251,11 @@ mod imp {
         if len == 0 {
             return "—".into();
         }
-        row.PhysicalAddress[..len].iter().map(|b| format!("{b:02X}")).collect::<Vec<_>>().join(":")
+        row.PhysicalAddress[..len]
+            .iter()
+            .map(|b| format!("{b:02X}"))
+            .collect::<Vec<_>>()
+            .join(":")
     }
 
     fn status(row: &MIB_IF_ROW2) -> AdapterStatus {
@@ -267,7 +312,11 @@ mod imp {
                     Some(AdapterInfo {
                         index: row.InterfaceIndex,
                         kind: kind_of(row, &alias, &desc),
-                        name: if alias.is_empty() { desc.clone() } else { alias },
+                        name: if alias.is_empty() {
+                            desc.clone()
+                        } else {
+                            alias
+                        },
                         description: desc,
                         mac: mac(row),
                         ipv4: a.ipv4,
@@ -431,7 +480,9 @@ mod imp {
             other => vec![other],
         };
         for item in items {
-            if let (Some(idx), Some(full)) = (item["ifIndex"].as_u64(), item["FullDuplex"].as_bool()) {
+            if let (Some(idx), Some(full)) =
+                (item["ifIndex"].as_u64(), item["FullDuplex"].as_bool())
+            {
                 map.insert(idx as u32, full);
             }
         }
@@ -448,15 +499,22 @@ mod imp {
     use std::fs;
 
     fn read(path: String) -> String {
-        fs::read_to_string(path).map(|s| s.trim().to_string()).unwrap_or_default()
+        fs::read_to_string(path)
+            .map(|s| s.trim().to_string())
+            .unwrap_or_default()
     }
 
     fn proc_net_dev() -> HashMap<String, (u64, u64)> {
         let mut map = HashMap::new();
         let text = fs::read_to_string("/proc/net/dev").unwrap_or_default();
         for line in text.lines().skip(2) {
-            let Some((name, rest)) = line.split_once(':') else { continue };
-            let cols: Vec<u64> = rest.split_whitespace().filter_map(|c| c.parse().ok()).collect();
+            let Some((name, rest)) = line.split_once(':') else {
+                continue;
+            };
+            let cols: Vec<u64> = rest
+                .split_whitespace()
+                .filter_map(|c| c.parse().ok())
+                .collect();
             if cols.len() >= 9 {
                 map.insert(name.trim().to_string(), (cols[0], cols[8]));
             }
@@ -474,7 +532,10 @@ mod imp {
             let base = format!("/sys/class/net/{name}");
             let index = read(format!("{base}/ifindex")).parse().unwrap_or(0);
             let oper = read(format!("{base}/operstate"));
-            let speed: u64 = read(format!("{base}/speed")).parse::<i64>().unwrap_or(0).max(0) as u64;
+            let speed: u64 = read(format!("{base}/speed"))
+                .parse::<i64>()
+                .unwrap_or(0)
+                .max(0) as u64;
             let hardware = fs::metadata(format!("{base}/device")).is_ok();
             let wireless = fs::metadata(format!("{base}/wireless")).is_ok();
             let if_type = if wireless { 71 } else { 6 };
@@ -507,7 +568,12 @@ mod imp {
     pub fn counters() -> Result<Vec<CounterRow>, String> {
         Ok(list_adapters()?
             .into_iter()
-            .map(|a| CounterRow { index: a.index, rx: a.rx_bytes, tx: a.tx_bytes, is_virtual: a.kind.is_virtual() })
+            .map(|a| CounterRow {
+                index: a.index,
+                rx: a.rx_bytes,
+                tx: a.tx_bytes,
+                is_virtual: a.kind.is_virtual(),
+            })
             .collect())
     }
 
@@ -533,14 +599,63 @@ mod tests {
 
     #[test]
     fn classification() {
-        assert_eq!(classify("Wi-Fi", "Intel(R) Wi-Fi 6 AX201", 71, true), AdapterKind::WiFi);
-        assert_eq!(classify("Ethernet", "Intel(R) Ethernet Connection", 6, true), AdapterKind::Ethernet);
-        assert_eq!(classify("vEthernet (WSL)", "Hyper-V Virtual Ethernet Adapter", 6, false), AdapterKind::Container);
-        assert_eq!(classify("vEthernet (Default Switch)", "Hyper-V Virtual Ethernet Adapter", 6, false), AdapterKind::HyperV);
-        assert_eq!(classify("Ethernet 3", "Fortinet Virtual Ethernet Adapter (NDIS 6.30)", 6, false), AdapterKind::Vpn);
-        assert_eq!(classify("VMware Network Adapter VMnet8", "VMware Virtual Ethernet Adapter for VMnet8", 6, false), AdapterKind::VmWare);
-        assert_eq!(classify("Local Area Connection* 1", "Microsoft Wi-Fi Direct Virtual Adapter", 71, false), AdapterKind::WifiDirect);
-        assert!(is_noise("Wi-Fi-WFP Native MAC Layer LightWeight Filter-0000", "x"));
+        assert_eq!(
+            classify("Wi-Fi", "Intel(R) Wi-Fi 6 AX201", 71, true),
+            AdapterKind::WiFi
+        );
+        assert_eq!(
+            classify("Ethernet", "Intel(R) Ethernet Connection", 6, true),
+            AdapterKind::Ethernet
+        );
+        assert_eq!(
+            classify(
+                "vEthernet (WSL)",
+                "Hyper-V Virtual Ethernet Adapter",
+                6,
+                false
+            ),
+            AdapterKind::Container
+        );
+        assert_eq!(
+            classify(
+                "vEthernet (Default Switch)",
+                "Hyper-V Virtual Ethernet Adapter",
+                6,
+                false
+            ),
+            AdapterKind::HyperV
+        );
+        assert_eq!(
+            classify(
+                "Ethernet 3",
+                "Fortinet Virtual Ethernet Adapter (NDIS 6.30)",
+                6,
+                false
+            ),
+            AdapterKind::Vpn
+        );
+        assert_eq!(
+            classify(
+                "VMware Network Adapter VMnet8",
+                "VMware Virtual Ethernet Adapter for VMnet8",
+                6,
+                false
+            ),
+            AdapterKind::VmWare
+        );
+        assert_eq!(
+            classify(
+                "Local Area Connection* 1",
+                "Microsoft Wi-Fi Direct Virtual Adapter",
+                71,
+                false
+            ),
+            AdapterKind::WifiDirect
+        );
+        assert!(is_noise(
+            "Wi-Fi-WFP Native MAC Layer LightWeight Filter-0000",
+            "x"
+        ));
         assert!(!is_noise("Wi-Fi", "Intel(R) Wi-Fi 6 AX201"));
     }
 }

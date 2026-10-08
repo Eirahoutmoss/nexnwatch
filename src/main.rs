@@ -18,7 +18,11 @@ fn init_logging() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("nexnwatch=info,warn"));
 
-    match std::fs::OpenOptions::new().create(true).append(true).open(paths::logs_dir().join(file_name)) {
+    match std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(paths::logs_dir().join(file_name))
+    {
         Ok(file) => {
             tracing_subscriber::fmt()
                 .with_env_filter(filter)
@@ -35,7 +39,9 @@ fn init_logging() {
 
 /// 14 günden eski log dosyalarını sil.
 fn prune_old_logs() {
-    let Ok(entries) = std::fs::read_dir(paths::logs_dir()) else { return };
+    let Ok(entries) = std::fs::read_dir(paths::logs_dir()) else {
+        return;
+    };
     let limit = std::time::Duration::from_secs(14 * 24 * 3600);
     for e in entries.flatten() {
         let old = e
@@ -54,9 +60,16 @@ fn install_panic_hook() {
     std::panic::set_hook(Box::new(|info| {
         let msg = match info.payload().downcast_ref::<&str>() {
             Some(s) => s.to_string(),
-            None => info.payload().downcast_ref::<String>().cloned().unwrap_or_else(|| "bilinmeyen hata".into()),
+            None => info
+                .payload()
+                .downcast_ref::<String>()
+                .cloned()
+                .unwrap_or_else(|| "bilinmeyen hata".into()),
         };
-        let location = info.location().map(|l| format!("{}:{}", l.file(), l.line())).unwrap_or_default();
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}", l.file(), l.line()))
+            .unwrap_or_default();
         tracing::error!("PANIC: {msg} @ {location}");
         // ETW oturumu açık kalmasın.
         collectors::etw::shutdown();
