@@ -109,6 +109,8 @@ pub struct App {
     // --- hız testi
     pub speed: SpeedTester,
     last_auto_check: Instant,
+    /// Son otomatik deneme (başarısız testler aralık dolmadan tekrar denenmesin).
+    last_auto_attempt: Option<Instant>,
 
     // --- kalıcı sayaç
     pub usage: UsageStore,
@@ -170,6 +172,7 @@ impl App {
             sort: ProcSort::Traffic,
             speed: SpeedTester::new(),
             last_auto_check: Instant::now(),
+            last_auto_attempt: None,
             usage: UsageStore::load(),
             last_usage_save: Instant::now(),
             notice: None,
@@ -348,13 +351,18 @@ impl App {
         // ---- 5) Otomatik hız testi
         if self.cfg.speedtest_auto && now.duration_since(self.last_auto_check) >= Duration::from_secs(5) {
             self.last_auto_check = now;
-            let interval = self.cfg.speedtest_interval_min as i64 * 60;
-            let due = match self.speed.last() {
-                Some(last) => chrono::Local::now().timestamp() - last.timestamp >= interval,
+            let interval = self.cfg.speedtest_interval_min * 60;
+            let by_history = match self.speed.last() {
+                Some(last) => (chrono::Local::now().timestamp() - last.timestamp) as u64 >= interval,
+                None => true,
+            };
+            let by_attempt = match self.last_auto_attempt {
+                Some(t) => now.duration_since(t) >= Duration::from_secs(interval),
                 // İlk test: açılıştan 30 sn sonra (ölçümler otursun).
                 None => now.duration_since(self.started) >= Duration::from_secs(30),
             };
-            if due && !speedtest_running {
+            if by_history && by_attempt && !speedtest_running {
+                self.last_auto_attempt = Some(now);
                 self.speed.start(true);
             }
         }

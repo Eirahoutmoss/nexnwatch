@@ -6,7 +6,7 @@ use iced::{Alignment, Background, Border, Color, Element, Length, Padding};
 use crate::app::{App, Message, ProcSort};
 use crate::collectors::etw::EtwStatus;
 use crate::theme::p;
-use crate::ui::{card, card_with, chip, tree};
+use crate::ui::{card, chip, tree};
 use crate::units;
 
 pub fn view(app: &App) -> Element<'_, Message> {
@@ -100,6 +100,9 @@ pub fn view(app: &App) -> Element<'_, Message> {
     }
 
     let etw_line = match app.etw.status() {
+        EtwStatus::Running if app.etw.event_count() == 0 && app.started.elapsed().as_secs() > 20 => {
+            "ETW oturumu açık ama henüz olay gelmedi — yönetici olarak çalıştığından ve güvenlik yazılımının ETW'yi engellemediğinden emin olun.".into()
+        }
         EtwStatus::Running => format!(
             "ETW Kernel-Network aktif · {} olay işlendi · {} process trafik yaptı",
             app.etw.event_count(),
@@ -109,11 +112,10 @@ pub fn view(app: &App) -> Element<'_, Message> {
         EtwStatus::Failed(e) => format!("ETW kullanılamıyor: {e}. Uygulamayı yönetici olarak çalıştırın."),
     };
 
-    let table = card_with(
+    let table = card(
         &format!("Tüm Process'ler ({})", app.processes.len()),
         &etw_line,
-        controls,
-        column![header, scrollable(rows).height(Length::Fixed(560.0))].spacing(6),
+        column![controls, header, scrollable(rows).height(Length::Fixed(540.0))].spacing(8),
     );
 
     let tree = card(

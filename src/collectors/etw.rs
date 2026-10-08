@@ -147,7 +147,10 @@ mod imp {
         };
 
         let ids: Vec<u16> = SEND_IDS.iter().chain(RECV_IDS.iter()).copied().collect();
+        // Tüm anahtar kelimeler açık (IPv4 0x10, IPv6 0x20 dahil); olay kimliği
+        // filtresi zaten yalnızca gönder/al olaylarını geçiriyor.
         let provider = Provider::by_guid(KERNEL_NETWORK_GUID)
+            .any(u64::MAX)
             .add_filter(EventFilter::ByEventIds(ids))
             .add_callback(callback)
             .build();

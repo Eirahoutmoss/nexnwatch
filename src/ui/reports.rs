@@ -1,5 +1,6 @@
 //! Raporlar — kalıcı günlük / haftalık / aylık kullanım ve oturum özeti.
 
+use chrono::Datelike;
 use iced::widget::{canvas, column, container, row, scrollable, text};
 use iced::{Element, Length};
 
@@ -76,7 +77,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
     for (d, u) in &days {
         day_rows = day_rows.push(
             row![
-                text(d.format("%d.%m.%Y %a").to_string()).size(11).color(p().text).width(w(110.0)),
+                text(format!("{} {}", d.format("%d.%m.%Y"), gun(d.weekday()))).size(11).color(p().text).width(w(110.0)),
                 text(units::bytes(u.rx)).size(11).color(p().rx).width(w(90.0)),
                 text(units::bytes(u.tx)).size(11).color(p().tx).width(w(90.0)),
                 text(units::bytes(u.total())).size(11).color(p().title).width(w(90.0)),
@@ -143,4 +144,17 @@ pub fn view(app: &App) -> Element<'_, Message> {
     ]
     .spacing(10)
     .into()
+}
+
+fn gun(w: chrono::Weekday) -> &'static str {
+    use chrono::Weekday::*;
+    match w {
+        Mon => "Pzt",
+        Tue => "Sal",
+        Wed => "Çar",
+        Thu => "Per",
+        Fri => "Cum",
+        Sat => "Cmt",
+        Sun => "Paz",
+    }
 }
