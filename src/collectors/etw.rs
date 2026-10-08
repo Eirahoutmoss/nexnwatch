@@ -313,6 +313,11 @@ mod imp {
                 }),
                 _ => None,
             };
+            // Makine içi (loopback) trafik NIC sayaçlarında yok; process
+            // toplamları adaptör toplamıyla tutarlı kalsın diye sayılmaz.
+            if key.is_some_and(|k| k.a.ip().is_loopback() && k.b.ip().is_loopback()) {
+                return;
+            }
             let now = Instant::now();
             let size = size as u64;
             if is_send {

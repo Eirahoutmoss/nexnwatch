@@ -22,10 +22,19 @@
 - [x] Dosyaya log, panic hook + yeniden başlatma, kapanışta ETW StopTrace
 - [x] GitHub Actions Windows derlemesi
 
-## Sonraki adaylar
-- [ ] ETW çalışmazsa yedek: GetExtendedTcpTable + GetPerTcpConnectionEStats
-- [ ] Process başına bağlantı listesi (uzak IP/port, ETW daddr/dport alanlarından)
-- [ ] Process bazlı kalıcı kullanım (uygulama adına göre günlük)
-- [ ] Sistem tepsisine küçültme, eşik aşımında bildirim
-- [ ] Final ikon seti (.ico), imzalama, installer
-- [ ] 24 saat dayanıklılık testi
+## v0.3
+- [x] ETW yedeği: GetExtendedTcpTable + GetPerTcp(6)ConnectionEStats (otomatik geçiş)
+- [x] Process / ağaç başına bağlantı listesi, ters DNS, servis adları
+- [x] Loopback trafiğinin process toplamlarından çıkarılması
+- [x] Uygulama bazında kalıcı günlük kullanım, Raporlar'da bugün / bu ay
+- [x] Sistem tepsisi, tepsiye küçültme, gizli başlangıç (--minimized)
+- [x] Kota ve düşük hız Windows bildirimleri
+- [x] İkon seti (.ico, pencere, tepsi), sürüm bilgisi, DPI manifesti
+- [x] Inno Setup kurulum dosyası, taşınabilir zip, etiketle GitHub Release
+- [x] CI: fmt + clippy -D warnings (Linux + Windows), birim testleri
+- [x] Bellek dayanıklılık ölçümü (Linux, demo kaynak, 250 ms tick)
+
+## Sizin makinenizde doğrulanacaklar
+- [ ] ETW ile process trafiği ve Görev Yöneticisi karşılaştırması (±%5)
+- [ ] 24 saat açık kalma (Windows)
+- [ ] Kod imzalama sertifikası (SmartScreen uyarısını kaldırmak için)
