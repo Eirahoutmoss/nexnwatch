@@ -26,6 +26,12 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: cargo test
         run: cargo test
+      - name: Hız testi (gerçek ağ)
+        run: |
+          for p in auto cloudflare ookla; do
+            out=$(cargo run -q -- --speedtest $p 2>/dev/null | tr '\n' ' ')
+            echo "::notice title=speedtest linux $p::$out"
+          done
 
   windows:
     name: Windows release + installer
@@ -44,6 +50,14 @@ jobs:
 
       - name: Build (release)
         run: cargo build --release
+
+      - name: Hız testi (gerçek ağ, release exe)
+        shell: pwsh
+        run: |
+          foreach ($p in 'auto','cloudflare','ookla') {
+            $out = (& .\target\release\nexnwatch.exe --speedtest $p | Out-String) -replace '\r?\n',' '
+            Write-Output "::notice title=speedtest windows $p::$out"
+          }
 
       - name: Version
         id: ver

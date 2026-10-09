@@ -97,11 +97,15 @@ pub fn view(app: &App) -> Element<'_, Message> {
     };
     let auto = if app.cfg.speedtest_auto {
         format!(
-            "Cloudflare hız testi · otomatik her {} dk (Ayarlar'dan değiştirilebilir)",
+            "Sunucu: {} · otomatik her {} dk (Ayarlar'dan değiştirilebilir)",
+            app.cfg.speed_provider.label(),
             app.cfg.speedtest_interval_min
         )
     } else {
-        "Cloudflare hız testi · otomatik test kapalı".to_string()
+        format!(
+            "Sunucu: {} · otomatik test kapalı",
+            app.cfg.speed_provider.label()
+        )
     };
     let top = card_with(
         "Hız Testi",
