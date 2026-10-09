@@ -40,6 +40,8 @@ pub struct Config {
     pub daily_quota_gb: f64,
     /// Hız testinde indirme bu değerin (Mbps) altındaysa bildirim. 0 = kapalı.
     pub speed_alert_mbps: f64,
+    /// Hız testi sağlayıcısı.
+    pub speed_provider: crate::workers::speedtest::SpeedProvider,
 }
 
 impl Default for Config {
@@ -59,6 +61,7 @@ impl Default for Config {
             notifications: true,
             daily_quota_gb: 0.0,
             speed_alert_mbps: 0.0,
+            speed_provider: Default::default(),
         }
     }
 }

@@ -50,6 +50,17 @@ pub fn view(app: &App) -> Element<'_, Message> {
     }))
     .spacing(4);
 
+    let providers = row(crate::workers::speedtest::SpeedProvider::ALL
+        .iter()
+        .map(|sp| {
+            chip(
+                sp.label().to_string(),
+                c.speed_provider == *sp,
+                Message::SetSpeedProvider(*sp),
+            )
+        }))
+    .spacing(4);
+
     let windows = row([10u64, 30, 60].iter().map(|m| {
         chip(
             format!("{m} dk"),
@@ -108,6 +119,11 @@ pub fn view(app: &App) -> Element<'_, Message> {
                 toggler(c.speedtest_auto).on_toggle(Message::SetSpeedAuto),
             ),
             setting("Test aralığı", "Otomatik testler arasındaki süre", intervals),
+            setting(
+                "Sunucu",
+                "Otomatik: önce Cloudflare, olmazsa Speedtest.net'in en yakın sunucusu (genelde ISS'nizin kendi sunucusu)",
+                providers,
+            ),
         ]
         .spacing(14),
     );
