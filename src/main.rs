@@ -78,7 +78,34 @@ fn install_panic_hook() {
     }));
 }
 
+/// `--speedtest [auto|cloudflare|ookla]`: arayüz açmadan bir hız testi yapar,
+/// sonucu JSON olarak yazar (teşhis ve CI doğrulaması için).
+fn cli_speedtest() -> Option<i32> {
+    let args: Vec<String> = std::env::args().collect();
+    let i = args.iter().position(|a| a == "--speedtest")?;
+    use workers::speedtest::{SpeedProvider, SpeedTester};
+    let provider = match args.get(i + 1).map(|s| s.to_lowercase()).as_deref() {
+        Some("cloudflare") => SpeedProvider::Cloudflare,
+        Some("ookla") | Some("speedtest") => SpeedProvider::Ookla,
+        _ => SpeedProvider::Auto,
+    };
+    match SpeedTester::new().run_blocking(provider) {
+        Ok(r) => {
+            println!("{}", serde_json::to_string_pretty(&r).unwrap_or_default());
+            Some(0)
+        }
+        Err(e) => {
+            eprintln!("HATA: {e}");
+            println!("HATA: {e}");
+            Some(1)
+        }
+    }
+}
+
 fn main() -> iced::Result {
+    if let Some(code) = cli_speedtest() {
+        std::process::exit(code);
+    }
     init_logging();
     install_panic_hook();
     tracing::info!("NexNWatch {} başlatılıyor", env!("CARGO_PKG_VERSION"));

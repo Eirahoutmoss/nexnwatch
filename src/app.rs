@@ -69,6 +69,7 @@ pub enum Message {
     SetNotifications(bool),
     SetQuota(f64),
     SetSpeedAlert(f64),
+    SetSpeedProvider(crate::workers::speedtest::SpeedProvider),
     ConnFilter(String),
     ConnScopeAll(bool),
 }
@@ -505,7 +506,7 @@ impl App {
             };
             if by_history && by_attempt && !speedtest_running {
                 self.last_auto_attempt = Some(now);
-                self.speed.start(true);
+                self.speed.start(true, self.cfg.speed_provider);
             }
         }
 
@@ -658,7 +659,7 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             app.cfg.save();
         }
         Message::SetChartRange(secs) => app.chart_secs = secs,
-        Message::SpeedTest => app.speed.start(false),
+        Message::SpeedTest => app.speed.start(false, app.cfg.speed_provider),
         Message::ProcessSearch(s) => app.search = s,
         Message::SelectRoot(pid) => {
             if let Some(p) = app.process(pid) {
@@ -741,7 +742,7 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             for action in tray::poll() {
                 match action {
                     TrayAction::Show => tasks.push(app.show_window()),
-                    TrayAction::SpeedTest => app.speed.start(false),
+                    TrayAction::SpeedTest => app.speed.start(false, app.cfg.speed_provider),
                     TrayAction::Quit => {
                         app.shutdown();
                         return iced::exit();
@@ -761,6 +762,10 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
         Message::SetQuota(gb) => {
             app.cfg.daily_quota_gb = gb;
             app.quota_notified = (String::new(), 0);
+            app.cfg.save();
+        }
+        Message::SetSpeedProvider(p) => {
+            app.cfg.speed_provider = p;
             app.cfg.save();
         }
         Message::SetSpeedAlert(m) => {
