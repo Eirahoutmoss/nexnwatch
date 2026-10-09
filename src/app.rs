@@ -16,6 +16,7 @@ use crate::state::usage_store::UsageStore;
 use crate::theme;
 use crate::tray::{self, TrayAction};
 use crate::units::DisplayUnit;
+use crate::workers::lan::{LanMode, LanTester};
 use crate::workers::speedtest::SpeedTester;
 use crate::workers::system;
 
@@ -25,6 +26,7 @@ pub enum Page {
     Adapters,
     Processes,
     Speed,
+    Lan,
     Reports,
     Settings,
 }
@@ -70,6 +72,17 @@ pub enum Message {
     SetQuota(f64),
     SetSpeedAlert(f64),
     SetSpeedProvider(crate::workers::speedtest::SpeedProvider),
+    LanServer(bool),
+    LanTarget(String),
+    LanPickPeer(String),
+    LanSetMode(LanMode),
+    LanSecs(u64),
+    LanStreams(usize),
+    LanUdpRate(f64),
+    LanStart,
+    LanSharePath(String),
+    LanShareSize(u64),
+    LanShareStart,
     ConnFilter(String),
     ConnScopeAll(bool),
 }
@@ -120,6 +133,12 @@ pub struct App {
 
     // --- hız testi
     pub speed: SpeedTester,
+    pub lan: LanTester,
+    pub lan_mode: LanMode,
+    pub lan_secs: u64,
+    pub lan_streams: usize,
+    pub lan_udp_rate: f64,
+    pub lan_share_size: u64,
     last_auto_check: Instant,
     /// Son otomatik deneme (başarısız testler aralık dolmadan tekrar denenmesin).
     last_auto_attempt: Option<Instant>,
@@ -203,6 +222,12 @@ impl App {
             search: String::new(),
             sort: ProcSort::Traffic,
             speed: SpeedTester::new(),
+            lan: LanTester::new(),
+            lan_mode: LanMode::Bidir,
+            lan_secs: 10,
+            lan_streams: 4,
+            lan_udp_rate: 100.0,
+            lan_share_size: 512,
             last_auto_check: Instant::now(),
             last_auto_attempt: None,
             usage: UsageStore::load(),
@@ -223,6 +248,12 @@ impl App {
             cfg,
         };
         app.last_speed_seen = app.speed.last().map(|r| r.timestamp).unwrap_or(0);
+        if app.cfg.lan_server {
+            match app.lan.set_server(true) {
+                Ok(()) => app.lan.start_discovery(),
+                Err(e) => app.notice = Some(format!("LAN sunucusu açılamadı: {e}")),
+            }
+        }
         app.update_local_ips();
         app.set_processes(processes);
 
@@ -325,7 +356,9 @@ impl App {
     }
 
     fn on_tick(&mut self, now: Instant) {
-        let speedtest_running = self.speed.is_running();
+        // Hız testi ve LAN testi trafiği pencere toplamlarına katılmaz.
+        let speedtest_running =
+            self.speed.is_running() || self.lan.is_running() || self.lan.server_busy();
 
         // ---- 1) NIC sayaçları (tek GetIfTable2 çağrısı)
         match nic::counters() {
@@ -640,7 +673,12 @@ fn subscription(app: &App) -> Subscription<Message> {
 fn update(app: &mut App, message: Message) -> Task<Message> {
     match message {
         Message::Tick(now) => app.on_tick(now),
-        Message::Navigate(page) => app.page = page,
+        Message::Navigate(page) => {
+            if page == Page::Lan {
+                app.lan.start_discovery();
+            }
+            app.page = page;
+        }
         Message::SelectAdapter(index) => {
             if app.selected != index {
                 app.selected = index;
@@ -764,6 +802,51 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
             app.quota_notified = (String::new(), 0);
             app.cfg.save();
         }
+        Message::LanServer(on) => match app.lan.set_server(on) {
+            Ok(()) => {
+                app.cfg.lan_server = on;
+                app.cfg.save();
+                app.lan.start_discovery();
+            }
+            Err(e) => app.notice = Some(format!("LAN sunucusu açılamadı: {e}")),
+        },
+        Message::LanTarget(s) => app.cfg.lan_target = s,
+        Message::LanPickPeer(ip) => {
+            app.cfg.lan_target = ip;
+            app.cfg.save();
+        }
+        Message::LanSetMode(m) => app.lan_mode = m,
+        Message::LanSecs(s) => app.lan_secs = s,
+        Message::LanStreams(n) => app.lan_streams = n,
+        Message::LanUdpRate(r) => app.lan_udp_rate = r,
+        Message::LanStart => match resolve_target(&app.cfg.lan_target) {
+            Ok(addr) => {
+                app.cfg.save();
+                let name = app
+                    .lan
+                    .peers()
+                    .into_iter()
+                    .find(|p| p.ip == addr.ip())
+                    .map(|p| p.name)
+                    .unwrap_or_default();
+                app.lan.start_test(
+                    addr,
+                    name,
+                    app.lan_mode,
+                    app.lan_secs,
+                    app.lan_streams,
+                    app.lan_udp_rate,
+                );
+            }
+            Err(e) => app.notice = Some(e),
+        },
+        Message::LanSharePath(s) => app.cfg.lan_share = s,
+        Message::LanShareSize(mb) => app.lan_share_size = mb,
+        Message::LanShareStart => {
+            app.cfg.save();
+            app.lan
+                .start_share_test(app.cfg.lan_share.clone(), app.lan_share_size);
+        }
         Message::SetSpeedProvider(p) => {
             app.cfg.speed_provider = p;
             app.cfg.save();
@@ -776,4 +859,29 @@ fn update(app: &mut App, message: Message) -> Task<Message> {
         Message::ConnScopeAll(v) => app.conn_scope_all = v,
     }
     Task::none()
+}
+
+/// "192.168.1.20", "192.168.1.20:47210", "PC-ADI" → soket adresi.
+fn resolve_target(s: &str) -> Result<std::net::SocketAddr, String> {
+    use std::net::ToSocketAddrs;
+    let s = s.trim();
+    if s.is_empty() {
+        return Err("Hedef bilgisayarın IP adresini girin ya da listeden seçin.".into());
+    }
+    if let Ok(a) = s.parse() {
+        return Ok(a);
+    }
+    if let Ok(ip) = s.parse::<std::net::IpAddr>() {
+        return Ok((ip, crate::workers::lan::PORT).into());
+    }
+    let with_port = if s.contains(':') {
+        s.to_string()
+    } else {
+        format!("{s}:{}", crate::workers::lan::PORT)
+    };
+    with_port
+        .to_socket_addrs()
+        .ok()
+        .and_then(|mut a| a.find(|x| x.is_ipv4()))
+        .ok_or_else(|| format!("\"{s}\" çözümlenemedi"))
 }
