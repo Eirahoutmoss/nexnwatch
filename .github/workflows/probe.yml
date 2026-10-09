@@ -1,0 +1,41 @@
+name: Net probe
+on:
+  push:
+    branches: ["probe-*", "fix-speedtest"]
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - name: Probe
+        shell: pwsh
+        run: |
+          $uaBrowser = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36'
+          $uaApp = 'NexNWatch/0.2'
+          function Probe($label, $args2) {
+            $out = & curl.exe -s -o NUL -w "%{http_code} %{size_download} %{time_total}" @args2
+            Write-Output "::notice title=$label::$out"
+          }
+          foreach ($ua in @($uaApp, $uaBrowser)) {
+            $t = if ($ua -eq $uaApp) { 'app' } else { 'browser' }
+            Probe "CF meta $t" @('-A', $ua, 'https://speed.cloudflare.com/meta')
+            Probe "CF trace $t" @('-A', $ua, 'https://speed.cloudflare.com/cdn-cgi/trace')
+            Probe "CF down $t" @('-A', $ua, 'https://speed.cloudflare.com/__down?bytes=10000000')
+            Probe "CF down ref $t" @('-A', $ua, '-H', 'Referer: https://speed.cloudflare.com/', '-H', 'Origin: https://speed.cloudflare.com', 'https://speed.cloudflare.com/__down?bytes=10000000')
+            Probe "CF up $t" @('-A', $ua, '-X', 'POST', '--data-binary', '@C:\Windows\System32\notepad.exe', 'https://speed.cloudflare.com/__up')
+            Probe "CF up ref $t" @('-A', $ua, '-H', 'Referer: https://speed.cloudflare.com/', '-H', 'Origin: https://speed.cloudflare.com', '-X', 'POST', '--data-binary', '@C:\Windows\System32\notepad.exe', 'https://speed.cloudflare.com/__up')
+          }
+          $h = & curl.exe -s -D - -o body.txt -A $uaApp 'https://speed.cloudflare.com/meta'
+          Write-Output "::notice title=CF meta headers::$(($h | Select-String -Pattern 'HTTP/|server|cf-mitigated|content-type') -join ' | ')"
+          Write-Output "::notice title=CF meta body::$((Get-Content body.txt -Raw).Substring(0, [Math]::Min(300,(Get-Content body.txt -Raw).Length)) -replace '\r?\n',' ')"
+          # Ookla sunucu listesi
+          $s = & curl.exe -s -A $uaBrowser 'https://www.speedtest.net/api/js/servers?engine=js&limit=5&https_functional=true'
+          Write-Output "::notice title=Ookla list::$($s.Substring(0,[Math]::Min(700,$s.Length)))"
+          try {
+            $srv = ($s | ConvertFrom-Json)[0]
+            $hst = $srv.host
+            Probe "Ookla down https $hst" @('-A', $uaBrowser, "https://$hst/download?nocache=1&size=10000000")
+            Probe "Ookla up https $hst" @('-A', $uaBrowser, '-X', 'POST', '--data-binary', '@C:\Windows\System32\notepad.exe', "https://$hst/upload?nocache=1")
+            Probe "Ookla hello $hst" @('-A', $uaBrowser, "https://$hst/hello")
+            Probe "Ookla latency.txt $hst" @('-A', $uaBrowser, "https://$hst/speedtest/latency.txt")
+          } catch { Write-Output "::warning title=Ookla parse::$_" }
