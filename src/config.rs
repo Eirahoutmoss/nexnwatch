@@ -42,6 +42,12 @@ pub struct Config {
     pub speed_alert_mbps: f64,
     /// Hız testi sağlayıcısı.
     pub speed_provider: crate::workers::speedtest::SpeedProvider,
+    /// LAN testi sunucu modu (açılışta da açık kalır).
+    pub lan_server: bool,
+    /// Son LAN testi hedefi (IP / ad).
+    pub lan_target: String,
+    /// Paylaşım testi yolu.
+    pub lan_share: String,
 }
 
 impl Default for Config {
@@ -62,6 +68,9 @@ impl Default for Config {
             daily_quota_gb: 0.0,
             speed_alert_mbps: 0.0,
             speed_provider: Default::default(),
+            lan_server: false,
+            lan_target: String::new(),
+            lan_share: String::new(),
         }
     }
 }

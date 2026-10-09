@@ -4,6 +4,7 @@ pub mod adapters;
 pub mod chart;
 pub mod connections;
 pub mod dashboard;
+pub mod lan;
 pub mod processes;
 pub mod reports;
 pub mod settings;
@@ -23,6 +24,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
         Page::Adapters => adapters::view(app),
         Page::Processes => processes::view(app),
         Page::Speed => speed::view(app),
+        Page::Lan => lan::view(app),
         Page::Reports => reports::view(app),
         Page::Settings => settings::view(app),
     };
@@ -79,6 +81,7 @@ fn header(app: &App) -> Element<'_, Message> {
         nav_button("🖧  Ağ Adaptörleri", Page::Adapters, app.page),
         nav_button("⌘  Process İzleme", Page::Processes, app.page),
         nav_button("◔  Hız Testi", Page::Speed, app.page),
+        nav_button("⇄  LAN Testi", Page::Lan, app.page),
         nav_button("▤  Raporlar", Page::Reports, app.page),
         nav_button("⚙  Ayarlar", Page::Settings, app.page),
     ]
@@ -92,6 +95,13 @@ fn header(app: &App) -> Element<'_, Message> {
     };
     let speed_badge: Element<'_, Message> = if app.speed.is_running() {
         text("⚡ Hız testi sürüyor").size(10).color(p().warn).into()
+    } else if app.lan.is_running() || app.lan.server_busy() {
+        text("⇄ LAN testi sürüyor").size(10).color(p().warn).into()
+    } else if app.lan.server_running() {
+        text("⇄ LAN sunucusu açık")
+            .size(10)
+            .color(p().accent)
+            .into()
     } else {
         Space::new().into()
     };

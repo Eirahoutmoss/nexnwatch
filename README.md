@@ -2,7 +2,7 @@
 
 Windows 10/11 x64 için Nex ailesinin gerçek zamanlı ağ izleme ve process bazlı trafik analizi uygulaması.
 
-## Özellikler (v0.3.1)
+## Özellikler (v0.4)
 
 **Ağ adaptörleri**
 - `GetIfTable2` ile NIC keşfi; loopback, tünel, WAN Miniport ve filtre sürücüsü kopyaları (WFP, QoS, Npcap…) elenir
@@ -39,6 +39,15 @@ Windows 10/11 x64 için Nex ailesinin gerçek zamanlı ağ izleme ve process baz
 - Manuel + otomatik (varsayılan her 5 dk), geçmiş tablosu ve grafiği
 - Test sürerken oluşan trafik 1/5/10 dk pencere toplamlarına katılmaz
 
+**LAN Testi** (iki bilgisayar arası — iPerf benzeri)
+- Bir bilgisayarda "Sunucu modu" açılır; diğerleri onu ağda otomatik bulur (UDP 47211 yayını)
+- TCP yükleme / indirme / çift yön, 1–8 paralel akış, alıcı tarafında ölçüm; gecikme (RTT)
+- UDP: seçilen hızda gönderim → paket kaybı, sıra dışı paket, jitter (RFC 3550) — VoIP/görüntü hattı kalitesi için
+- **Ağ paylaşımı (SMB) testi**: `\\SUNUCU\Paylasim`'a geçici dosya yazar, okur, siler; Windows önbelleği atlanır (NO_BUFFERING) — NAS / dosya sunucusu gerçek hızı
+- Sonucu bağlantı hızıyla karşılaştırır; geçmiş `lan_history.json`
+- Güvenlik duvarı kuralı yalnızca Özel/Etki alanı profillerine otomatik eklenir
+- Komut satırı: `--lan-server [sn]`, `--lan-test <ip> [up|down|bidir|udp] [sn] [akış] [udp_mbps]`, `--share-test <yol> [MB]`
+
 **Raporlar** — kullanım özeti, son 30 gün grafiği, günlük döküm, aylık toplam, **uygulama bazında kalıcı kullanım (bugün / bu ay)**, oturumdaki process'ler
 
 **Tepsi ve bildirimler**
@@ -54,6 +63,7 @@ Windows 10/11 x64 için Nex ailesinin gerçek zamanlı ağ izleme ve process baz
 - `config.toml` — ayarlar
 - `usage.json` — günlük kullanım
 - `speedtest_history.json` — hız testi geçmişi
+- `lan_history.json` — LAN / paylaşım testi geçmişi
 - `logs\nexnwatch-YYYY-MM-DD.log` — 14 gün saklanır
 
 ## Kurulum

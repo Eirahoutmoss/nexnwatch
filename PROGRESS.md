@@ -34,7 +34,14 @@
 - [x] CI: fmt + clippy -D warnings (Linux + Windows), birim testleri
 - [x] Bellek dayanıklılık ölçümü (Linux, demo kaynak, 250 ms tick)
 
+## v0.4
+- [x] LAN Testi: sunucu modu + otomatik keşif, TCP (yukarı/aşağı/çift yön, paralel akış), RTT
+- [x] UDP kayıp / jitter testi
+- [x] Ağ paylaşımı (SMB) yazma/okuma testi, önbelleksiz G/Ç
+- [x] CI: Windows'ta TCP/UDP + gerçek SMB paylaşımı + güvenlik duvarı kuralı doğrulaması
+
 ## Sizin makinenizde doğrulanacaklar
+- [ ] İki gerçek bilgisayar arasında LAN testi (Görev Yöneticisi / iperf3 ile karşılaştırma)
 - [ ] ETW ile process trafiği ve Görev Yöneticisi karşılaştırması (±%5)
 - [ ] 24 saat açık kalma (Windows)
 - [ ] Kod imzalama sertifikası (SmartScreen uyarısını kaldırmak için)
