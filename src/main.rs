@@ -102,8 +102,80 @@ fn cli_speedtest() -> Option<i32> {
     }
 }
 
+/// LAN testi komut satırı:
+///   `--lan-server`                                   sunucu modunda bekler
+///   `--lan-test <ip[:port]> [up|down|bidir|udp] [sn] [akış] [udp_mbps]`
+///   `--share-test <klasör veya \\sunucu\paylasim> [MB]`
+fn cli_lan() -> Option<i32> {
+    use workers::lan::{LanMode, LanTester, PORT};
+    let args: Vec<String> = std::env::args().collect();
+    let arg = |i: usize| args.get(i).cloned().unwrap_or_default();
+    let t = LanTester::new();
+    if let Some(i) = args.iter().position(|a| a == "--lan-server") {
+        let secs: u64 = arg(i + 1).parse().unwrap_or(0);
+        if let Err(e) = t.set_server(true) {
+            println!("HATA: {e}");
+            return Some(1);
+        }
+        println!("LAN sunucusu TCP {PORT} üzerinde bekliyor");
+        let until = std::time::Instant::now()
+            + std::time::Duration::from_secs(if secs == 0 { u64::MAX / 4 } else { secs });
+        while std::time::Instant::now() < until {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+        return Some(0);
+    }
+    if let Some(i) = args.iter().position(|a| a == "--lan-test") {
+        let host = arg(i + 1);
+        let target: std::net::SocketAddr = host
+            .parse()
+            .or_else(|_| format!("{host}:{PORT}").parse())
+            .or_else(|_| {
+                use std::net::ToSocketAddrs;
+                (host.as_str(), PORT)
+                    .to_socket_addrs()
+                    .map_err(|_| ())
+                    .and_then(|mut a| a.next().ok_or(()))
+            })
+            .ok()?;
+        let mode = match arg(i + 2).as_str() {
+            "up" => LanMode::Upload,
+            "down" => LanMode::Download,
+            "udp" => LanMode::Udp,
+            _ => LanMode::Bidir,
+        };
+        let secs = arg(i + 3).parse().unwrap_or(10);
+        let streams = arg(i + 4).parse().unwrap_or(4);
+        let rate = arg(i + 5).parse().unwrap_or(100.0);
+        return Some(match t.run_test(target, mode, secs, streams, rate) {
+            Ok(r) => {
+                println!("{}", serde_json::to_string_pretty(&r).unwrap_or_default());
+                0
+            }
+            Err(e) => {
+                println!("HATA: {e}");
+                1
+            }
+        });
+    }
+    if let Some(i) = args.iter().position(|a| a == "--share-test") {
+        let mb = arg(i + 2).parse().unwrap_or(256);
+        return Some(match t.run_share_test(&arg(i + 1), mb) {
+            Ok(r) => {
+                println!("{}", serde_json::to_string_pretty(&r).unwrap_or_default());
+                0
+            }
+            Err(e) => {
+                println!("HATA: {e}");
+                1
+            }
+        });
+    }
+    None
+}
+
 fn main() -> iced::Result {
-    if let Some(code) = cli_speedtest() {
+    if let Some(code) = cli_speedtest().or_else(cli_lan) {
         std::process::exit(code);
     }
     init_logging();

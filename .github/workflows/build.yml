@@ -59,6 +59,28 @@ jobs:
             Write-Output "::notice title=speedtest windows $p::$out"
           }
 
+      - name: LAN testi (release exe, gerçek SMB paylaşımı)
+        shell: pwsh
+        run: |
+          $exe = ".\target\release\nexnwatch.exe"
+          $srv = Start-Process -FilePath $exe -ArgumentList '--lan-server','120' -PassThru
+          Start-Sleep -Seconds 3
+          foreach ($m in 'bidir','up','down') {
+            $out = (& $exe --lan-test 127.0.0.1 $m 3 4 | Out-String) -replace '\r?\n',' '
+            Write-Output "::notice title=lan tcp $m::$out"
+          }
+          $out = (& $exe --lan-test 127.0.0.1 udp 3 1 200 | Out-String) -replace '\r?\n',' '
+          Write-Output "::notice title=lan udp 200::$out"
+          New-Item -ItemType Directory -Force C:\nnwshare | Out-Null
+          New-SmbShare -Name nnw -Path C:\nnwshare -FullAccess Everyone | Out-Null
+          $out = (& $exe --share-test '\\localhost\nnw' 256 | Out-String) -replace '\r?\n',' '
+          Write-Output "::notice title=lan smb::$out"
+          $left = (Get-ChildItem C:\nnwshare).Count
+          Write-Output "::notice title=lan smb cleanup::kalan dosya: $left"
+          $rule = (netsh advfirewall firewall show rule name="NexNWatch LAN Testi" | Out-String) -replace '\r?\n',' '
+          Write-Output "::notice title=lan firewall::$rule"
+          Stop-Process -Id $srv.Id -Force
+
       - name: Version
         id: ver
         shell: pwsh
