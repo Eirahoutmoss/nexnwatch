@@ -119,6 +119,9 @@ fn explain(step: &str, e: &ureq::Error) -> String {
         ureq::Error::StatusCode(403) => format!(
             "{step}: sunucu isteği reddetti (HTTP 403). Kurum güvenlik duvarı / web filtresi hız testi sitelerini engelliyor olabilir."
         ),
+        ureq::Error::StatusCode(429) => {
+            format!("{step}: sunucu çok sık test yapıldığı için geçici olarak sınırladı (HTTP 429)")
+        }
         ureq::Error::StatusCode(c) => format!("{step}: sunucu HTTP {c} döndü"),
         ureq::Error::Timeout(_) => format!("{step}: zaman aşımı"),
         ureq::Error::HostNotFound => format!("{step}: DNS çözümlenemedi"),
