@@ -16,15 +16,10 @@ jobs:
             $out = & curl.exe -s -o NUL -w "%{http_code} %{size_download} %{time_total}" @args2
             Write-Output "::notice title=$label::$out"
           }
-          foreach ($ua in @($uaApp, $uaBrowser)) {
-            $t = if ($ua -eq $uaApp) { 'app' } else { 'browser' }
-            Probe "CF meta $t" @('-A', $ua, 'https://speed.cloudflare.com/meta')
-            Probe "CF trace $t" @('-A', $ua, 'https://speed.cloudflare.com/cdn-cgi/trace')
-            Probe "CF down $t" @('-A', $ua, 'https://speed.cloudflare.com/__down?bytes=10000000')
-            Probe "CF down ref $t" @('-A', $ua, '-H', 'Referer: https://speed.cloudflare.com/', '-H', 'Origin: https://speed.cloudflare.com', 'https://speed.cloudflare.com/__down?bytes=10000000')
-            Probe "CF up $t" @('-A', $ua, '-X', 'POST', '--data-binary', '@C:\Windows\System32\notepad.exe', 'https://speed.cloudflare.com/__up')
-            Probe "CF up ref $t" @('-A', $ua, '-H', 'Referer: https://speed.cloudflare.com/', '-H', 'Origin: https://speed.cloudflare.com', '-X', 'POST', '--data-binary', '@C:\Windows\System32\notepad.exe', 'https://speed.cloudflare.com/__up')
-          }
+          $tr = & curl.exe -s -A $uaApp 'https://speed.cloudflare.com/cdn-cgi/trace'
+          Write-Output "::notice title=CF trace body::$($tr -join ' ')"
+          $ii = & curl.exe -s -A $uaApp 'https://ipinfo.io/json'
+          Write-Output "::notice title=ipinfo::$($ii -join ' ')"
           $h = & curl.exe -s -D - -o body.txt -A $uaApp 'https://speed.cloudflare.com/meta'
           Write-Output "::notice title=CF meta headers::$(($h | Select-String -Pattern 'HTTP/|server|cf-mitigated|content-type') -join ' | ')"
           Write-Output "::notice title=CF meta body::$((Get-Content body.txt -Raw).Substring(0, [Math]::Min(300,(Get-Content body.txt -Raw).Length)) -replace '\r?\n',' ')"
